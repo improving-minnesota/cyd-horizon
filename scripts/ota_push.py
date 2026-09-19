@@ -14,8 +14,9 @@ What it does:
      triggering - avoiding the code=-1 connect race described in
      DEVELOPER.md ("Avoid a reset before sending the command"). If the boot
      log reports a release build ("[boot] version=" without -dev), the push
-     exits immediately - release firmware has no serial-OTA listener, so the
-     board needs one USB flash (scripts/flash.py) to get a dev build on.
+     falls back to a one-time USB flash of the same build dir (release
+     firmware has no serial-OTA listener) - the flashed dev build accepts
+     OTA from then on.
   3. Sends OTA_VER=<version label> (extracted from the binary's embedded
      CYD_TAG= string) so the OTA screen shows the real version, then
      OTA_URL=http://<host-ip>:<http-port>/<bin>, and streams the
@@ -51,9 +52,11 @@ import threading
 import time
 
 import serial
+import subprocess
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import detect_boards
+import flash
 
 BAUD = 115200
 WIFI_WAIT_S = 45      # after reset, wait this long for "[net] ip="
@@ -147,10 +150,35 @@ def log(board, msg):
               flush=True)
 
 
-def run_ota(port, board, url_path, tag, http_port, results):
+def usb_flash(port, board, input_dir, label):
+    """USB-upload input_dir to the board on `port` - the fallback for boards
+    running release firmware, which has no serial-OTA listener. Mirrors
+    flash.py's invocation (per-board baud; the E32R40T's CH340 can't take
+    921600). Returns the result string recorded for this port."""
+    if not input_dir or not os.path.isdir(input_dir):
+        return "release build; no build dir to USB-flash"
+    speed = flash.BOARDS.get(board, {}).get("speed", 115200)
+    cmd = ["arduino-cli", "upload", "-b", flash.FQBN,
+           "--input-dir", input_dir, "-p", port,
+           "--upload-property", "upload.speed=%d" % speed]
+    log(label, "+ " + " ".join(cmd))
+    proc = subprocess.Popen(cmd, stdout=subprocess.PIPE,
+                            stderr=subprocess.STDOUT, text=True,
+                            errors="replace")
+    for line in proc.stdout:
+        log(label, line.rstrip())
+    proc.wait()
+    if proc.returncode == 0:
+        log(label, "flashed over USB - this dev build accepts the next OTA")
+        return "ok (usb flash)"
+    return "USB flash failed (exit %d)" % proc.returncode
+
+
+def run_ota(port, board, url_path, tag, http_port, results, flash_dir=None):
     """Reset one board, wait for its [net] ip=, send OTA_VER/OTA_URL for
     url_path (relative to the served dir), and watch until it reboots into
-    the new image. Runs standalone or as a worker thread in --all mode;
+    the new image. A board running release firmware is USB-flashed from
+    flash_dir instead. Runs standalone or as a worker thread in --all mode;
     result is recorded in results[port]."""
     label = board if board else None
     ser = None
@@ -180,13 +208,17 @@ def run_ota(port, board, url_path, tag, http_port, results):
                         continue
                     log(label, line)
                     # A release build never prints "[net] ip=" and ignores OTA
-                    # commands - bail instead of the WiFi timeout. (Pre-trigger
-                    # only: post-`sent`, version= marks the new image's boot.)
+                    # commands - USB-flash it instead of the WiFi timeout.
+                    # (Pre-trigger only: post-`sent`, version= marks the new
+                    # image's boot.)
                     mv = re.search(r"\[boot\] version=(\S+)", line)
                     if mv and not sent and "-dev" not in mv.group(1):
-                        results[port] = ("board runs release build %s - serial "
-                                         "OTA needs a dev build; flash once "
-                                         "with scripts/flash.py" % mv.group(1))
+                        log(label, "board runs release build %s - "
+                                   "USB-flashing instead" % mv.group(1))
+                        ser.close()   # free the port for esptool
+                        ser = None
+                        results[port] = usb_flash(port, board, flash_dir,
+                                                  label)
                         return
                     m = re.search(r"\[net\] ip=(\S+)", line)
                     if m and not sent:
@@ -244,7 +276,7 @@ def push_all(args):
     info = detect_boards.probe_ports(ports, detect_boards.PROBE_S,
                                      want_ip=False)
 
-    jobs = []   # (port, board, url_path, tag)
+    jobs = []   # (port, board, url_path, tag, flash_dir)
     for p in ports:
         board = info.get(p, {}).get("board", "unknown")
         ver = info.get(p, {}).get("version")
@@ -255,18 +287,18 @@ def push_all(args):
         if board not in KNOWN_BOARDS:
             print("  skipping %s (unknown board - can't pick a binary)" % p)
             continue
-        # Release firmware has no serial-OTA listener - only dev builds accept
-        # OTA_URL. Boards too old to print version= fall through to the WiFi wait.
+        # Release firmware has no serial-OTA listener; run_ota USB-flashes
+        # those boards instead. Boards too old to print version= fall through
+        # to the WiFi wait.
         if ver and "-dev" not in ver:
-            print("  skipping %s (release build %s - flash once with "
-                  "scripts/flash.py)" % (p, ver))
-            continue
-        binpath = os.path.join(build_root, variant_subdir(board), args.file)
+            print("  %s runs release %s - will USB-flash" % (p, ver))
+        flash_dir = os.path.join(build_root, variant_subdir(board))
+        binpath = os.path.join(flash_dir, args.file)
         if not os.path.isfile(binpath):
             print("  skipping %s (no image: %s)" % (p, binpath))
             continue
         jobs.append((p, board, variant_subdir(board) + "/" + args.file,
-                     build_tag(binpath)))
+                     build_tag(binpath), flash_dir))
 
     if not jobs:
         sys.exit("nothing to update")
@@ -276,19 +308,20 @@ def push_all(args):
 
     results = {}
     threads = [threading.Thread(target=run_ota,
-                                args=(p, b, path, tag, args.http_port, results),
+                                args=(p, b, path, tag, args.http_port, results,
+                                      fdir),
                                 daemon=True)
-               for (p, b, path, tag) in jobs]
+               for (p, b, path, tag, fdir) in jobs]
     for t in threads:
         t.start()
     for t in threads:
         t.join()
 
     failed = False
-    for (p, b, _, _) in jobs:
+    for (p, b, _, _, _) in jobs:
         res = results.get(p, "no result")
         print("%s (%s): %s" % (p, b, res))
-        failed |= res != "ok"
+        failed |= not res.startswith("ok")
     if failed:
         sys.exit(1)
 
@@ -331,9 +364,9 @@ def main():
         print("image label: %s" % tag)
 
     results = {}
-    run_ota(port, None, args.file, tag, args.http_port, results)
+    run_ota(port, want_board, args.file, tag, args.http_port, results, bindir)
     res = results.get(port)
-    if res != "ok":
+    if not (res or "").startswith("ok"):
         sys.exit(res or "OTA did not complete")
 
 

@@ -256,12 +256,13 @@ arduino-cli upload -p /dev/cu.usbserial-XXXX -b esp32:esp32:jczn_2432s028r:Parti
 > ```
 >
 > If the board's boot log reports a release build (`[boot] version=` without
-> `-dev` — printed on every build now), the push exits immediately instead of
-> waiting out the WiFi timeout: release firmware has no serial-OTA listener,
-> so that board needs one USB flash (`scripts/flash.py`) before OTA works.
-> `--all` skips release boards the same way. Boards running firmware old
-> enough to not print `version=` at all can't be distinguished up front and
-> still hit the timeout — flash them once.
+> `-dev` — printed on every build now), the push falls back to a one-time USB
+> flash of the same build dir instead of waiting out the WiFi timeout:
+> release firmware has no serial-OTA listener, so that board gets a dev build
+> over USB and accepts OTA from then on. `--all` USB-flashes release boards
+> the same way. Boards running firmware old enough to not print `version=` at
+> all can't be distinguished up front and still hit the timeout — flash them
+> once with `scripts/flash.py`.
 >
 > Manual alternative: serve the `.bin` over HTTP from a machine the board can
 > reach (a static server at the build directory's root), then pass the full
@@ -1055,12 +1056,14 @@ for the closest overhead plane (`planes[0]` when `distMi <= g_radiusMi`), and
 each is fetched once per overhead identity. The results (`g_routeOrigin` /
 `g_routeDest` and `g_trackPts` / `g_trackBearingDeg`) are cached while that plane
 remains the closest overhead, so the same flight does not trigger repeated
-route/track calls on every poll. If a fetch fails with a TLS error, a `429`
-(credits exhausted), or a truncated/bad-framing response, the failure is treated
-as "fetched" for that plane and is not retried, preventing burned credits on
-errors that won't resolve before the plane passes. A pure no-WiFi exit is
-transient, so `fetchRoute()` leaves the fetched flag false and will retry once
-the link returns.
+route/track calls on every poll. The exception is a promoted watched callsign
+(`watchcs`, including `*`): while its flight is shown, `fetchTrack()` refetches
+every poll so the track + blip follow the real trajectory. If a fetch fails
+with a TLS error, a `429` (credits exhausted), or a truncated/bad-framing
+response, the failure is treated as "fetched" for that plane and is not
+retried, preventing burned credits on errors that won't resolve before the
+plane passes. A pure no-WiFi exit is transient, so `fetchRoute()` leaves the
+fetched flag false and will retry once the link returns.
 
 `fetchTrack()` (in `flight_details.ino`) also retrieves the tracked plane's
 ground-track polyline from `/tracks` and stores a bounded set of points (max 64,
