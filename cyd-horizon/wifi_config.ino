@@ -7,9 +7,10 @@ bool g_kbShift = false;     // one-shot: capital for the next letter only
 bool g_kbCaps  = false;     // caps lock: capitals until Shift is tapped again
 bool g_kbSym   = false;     // symbol/number pad mode
 int  g_kbCursor = 0;        // edit cursor index (0..length) in the active field
+int  g_kbStart  = 0;        // first visible char index (persistent scroll position)
 int  g_lastKbSub = -1;      // last field drawn, so we can reset the cursor on change
 bool g_kbShow = false;      // password fields: true shows the value in cleartext
-bool kbFieldPw() { return (g_wifiSub == 2 || g_wifiSub == 4); }   // password-type fields
+bool kbFieldPw() { return (g_wifiSub == 2 || g_wifiSub == 4 || g_wifiSub == 9); }   // password-type fields
 String g_networks[20];      // deduplicated SSIDs
 String g_netChan[20];       // comma-joined channel list per SSID (e.g. "1,6")
 int   g_netAps[20];         // how many access points share that SSID
@@ -381,18 +382,33 @@ char keyFromXY(int x, int y) {
 // g_kbCursor (0..length) is the edit cursor, reset to end on field change;
 // taps in the field place it, keys act at it.
 
-// Scroll so the cursor stays visible; returns the first visible char + its
-// pixel width (the shared base keeps drawn text and the cursor bar aligned).
+// The string as drawn: masked password fields show '*'s, whose widths differ
+// from the real glyphs - all width math must measure this, not the raw buffer.
+String kbDisplay(const String& text) {
+  if (!kbFieldPw() || g_kbShow) return text;
+  String mask;
+  for (unsigned int i = 0; i < text.length(); i++) mask += '*';
+  return mask;
+}
+
+// Keep the cursor inside the persistent scroll window (g_kbStart); the window
+// only moves when the cursor leaves it, so taps in the field don't re-anchor
+// the view. Returns the first visible char + its pixel width (the shared base
+// keeps drawn text and the cursor bar aligned).
 void kbVisibleRange(const String& text, int& start, int& startWidth, int avail) {
   int len = text.length();
   if (g_kbCursor < 0) g_kbCursor = 0;
   if (g_kbCursor > len) g_kbCursor = len;
+  if (g_kbStart < 0) g_kbStart = 0;
+  if (g_kbStart > len) g_kbStart = len;
   int cursorX = tft.textWidth(text.substring(0, g_kbCursor));
-  int off = 0;
-  if (cursorX - off > avail - 2) off = cursorX - (avail - 2);
-  if (cursorX - off < 0) off = cursorX;
-  start = 0;
-  while (start < len && tft.textWidth(text.substring(0, start + 1)) <= off) start++;
+  // Cursor past the right edge: scroll forward until it fits at the edge.
+  while (g_kbStart < g_kbCursor &&
+         cursorX - tft.textWidth(text.substring(0, g_kbStart)) > avail - 2) g_kbStart++;
+  // Cursor left of the window: scroll back until it's visible at the left edge.
+  while (g_kbStart > 0 &&
+         cursorX - tft.textWidth(text.substring(0, g_kbStart)) < 0) g_kbStart--;
+  start = g_kbStart;
   startWidth = tft.textWidth(text.substring(0, start));
 }
 
@@ -408,26 +424,27 @@ int cursorIndexAt(const String& text, int textX) {
   return best;
 }
 
-// Editable field with cursor bar + scroll; password fields mask the text and
-// reserve `avail` room for the View/Hide toggle.
-void drawEditableField(const String& text, bool pw, int avail) {
+// Editable field with cursor bar + scroll; password fields mask the text (via
+// kbDisplay) and reserve `avail` room for the View/Hide toggle.
+void drawEditableField(const String& text, int avail) {
   tft.fillRoundRect(6, 34, DISP_W - 14, 22, 4, TFT_DARKGREY);
   tft.setTextColor(TFT_GREENYELLOW, TFT_DARKGREY);
   tft.setTextFont(2);
 
-  int len = text.length();
+  String disp = kbDisplay(text);
+  int len = disp.length();
   if (g_kbCursor < 0) g_kbCursor = 0;
   if (g_kbCursor > len) g_kbCursor = len;
   int start, startWidth;
-  kbVisibleRange(text, start, startWidth, avail);
-  int cursorX = tft.textWidth(text.substring(0, g_kbCursor));
+  kbVisibleRange(disp, start, startWidth, avail);
+  int cursorX = tft.textWidth(disp.substring(0, g_kbCursor));
   int cursorScreenX = 10 + (cursorX - startWidth);
 
-  String visible = text.substring(start);
-  if (pw && !g_kbShow) {
-    String mask;
-    for (int i = 0; i < visible.length(); i++) mask += '*';
-    visible = mask;
+  // Clip the tail to the field width - an unclipped run would overflow the
+  // right edge (and sit under the View/Hide toggle on password fields).
+  String visible = disp.substring(start);
+  while (visible.length() > 0 && tft.textWidth(visible) > avail) {
+    visible.remove(visible.length() - 1);
   }
 
   tft.setCursor(10, 38);
@@ -449,9 +466,9 @@ void drawKeyboard(const String& title, const String& text, bool pw) {
   backBtn("Back");
 
   // Reset the edit cursor to the end whenever the active field changes.
-  if (g_wifiSub != g_lastKbSub) { g_kbCursor = text.length(); g_lastKbSub = g_wifiSub; g_kbShow = false; }
+  if (g_wifiSub != g_lastKbSub) { g_kbCursor = text.length(); g_kbStart = 0; g_lastKbSub = g_wifiSub; g_kbShow = false; }
   // Password fields leave room on the right for the View/Hide toggle.
-  drawEditableField(text, pw, pw ? RX(252) : RX(300));
+  drawEditableField(text, pw ? RX(252) : RX(300));
 
   // View/Hide toggle for password fields (reveals the value in cleartext).
   if (pw) {
@@ -568,12 +585,15 @@ void handleKeyboardTouch(uint16_t x, uint16_t y) {
     return;
   }
 
-  // Tap in the text field to place the edit cursor at that character.
+  // Tap in the text field to place the edit cursor at that character. Measure
+  // the displayed string ('*' mask or real text) with the field's font.
   if (x >= 6 && x <= DISP_W - 6 && y >= 34 && y <= 56) {
+    tft.setTextFont(2);
+    String disp = kbDisplay(buf);
     int start, startWidth;
-    kbVisibleRange(buf, start, startWidth, kbFieldPw() ? RX(252) : RX(300));
+    kbVisibleRange(disp, start, startWidth, kbFieldPw() ? RX(252) : RX(300));
     int fullX = (x - 10) + startWidth;
-    g_kbCursor = cursorIndexAt(buf, fullX);
+    g_kbCursor = cursorIndexAt(disp, fullX);
     dirty = true;
     return;
   }

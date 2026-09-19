@@ -1547,8 +1547,8 @@ void fetchFlights() {
     unsigned long nowMs = millis();
     if (!g_routeFetched && (long)(nowMs - g_nextRouteMs) >= 0) fetchRoute(planes[0].icao24);
     // A watched flight's track refetches every poll so path + blip follow its
-    // real trajectory - except "*", which would refetch for every flight.
-    if ((!g_trackFetched || (watchShown && !watchIsWildcard())) && (long)(nowMs - g_nextTrackMs) >= 0) fetchTrack(planes[0].icao24);
+    // real trajectory.
+    if ((!g_trackFetched || watchShown) && (long)(nowMs - g_nextTrackMs) >= 0) fetchTrack(planes[0].icao24);
     if (!g_adsbRouteFetched && (long)(nowMs - g_nextAdsbMs) >= 0) fetchAdsbRoute(planes[0].callsign);
     // LED from best route data (OpenSky preferred, adsb.lol fills gaps):
     // yellow home / green arrival / red departure / blue. Watched callsigns
@@ -2512,12 +2512,15 @@ void drawDottedLineSafe(int x0, int y0, int x1, int y1, uint16_t col, int dash, 
 }
 
 // Would a blip at (px,py) overlap an on-screen object? Such blips are skipped
-// rather than erased-through later; boxes are padded by kBlipR.
-bool blipBlocked(int px, int py) {
+// rather than erased-through later; boxes are padded by kBlipR. skipLogo lets
+// blipOnScreen() treat the airline-logo zone as showable - a watched flight in
+// that corner still counts even though the blip itself can't draw there.
+bool blipBlocked(int px, int py, bool skipLogo) {
   const int R = kBlipR;
   if (py <= 33 + R) return true;                                     // header band
   if (inRect(px, py, -R, 34 - R, 171 + R, 208 + R)) return true;     // flight-info text
-  if (inRect(px, py, RX(222) - R, 34 - R, RX(320) + R, 93 + R)) return true; // airline logo
+  if (!skipLogo &&
+      inRect(px, py, RX(222) - R, 34 - R, RX(320) + R, 93 + R)) return true; // airline logo
   if (g_screen == SCR_DASH) {
     // The countdown bar only occupies the right strip while the timer is shown;
     // when it's toggled off, that space is free for blips to draw in.
@@ -2577,7 +2580,7 @@ bool plotRadarBlip(int cx, int cy, float scale, float dxMi, float dyMi, float di
   int px = cx + (int)(dxMi * scale);
   int py = cy - (int)(dyMi * scale);
   if (px < 0 || px > DISP_W - 1 || py < 0 || py > 239) return false;
-  if (blipBlocked(px, py)) return false;
+  if (blipBlocked(px, py, false)) return false;
   drawPlaneIcon(px, py, hdgDeg, color, glyphScale);
   outPx = px; outPy = py;
   return true;
@@ -2587,13 +2590,16 @@ bool plotRadarBlip(int cx, int cy, float scale, float dxMi, float dyMi, float di
 // safe because blips are never drawn over on-screen objects.
 void eraseRadarBlip(int px, int py) { tft.fillCircle(px, py, kBlipR, TFT_BLACK); }
 
-// True when the blip lands inside screen bounds - fetchFlights() only promotes
-// a watched callsign that would actually draw.
+// True when the blip would actually draw - fetchFlights() only promotes a
+// watched callsign that lands clear of the keep-out zones (text column,
+// header, timer/cog, status strip). The logo zone still counts: the flight is
+// shown even while its blip sits behind the logo.
 bool blipOnScreen(const Plane& p) {
   float scale = (float)kRadarR / g_radiusMi;
   int px = kRadarCX + (int)(p.dxMi * scale);
   int py = kRadarCY - (int)(p.dyMi * scale);
-  return px >= 0 && px <= DISP_W - 1 && py >= 0 && py <= 239;
+  return px >= 0 && px <= DISP_W - 1 && py >= 0 && py <= 239 &&
+         !blipBlocked(px, py, true);
 }
 
 // The overhead flight (planes[0], whose details are on the left) is cyan so

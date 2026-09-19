@@ -722,7 +722,7 @@ void handleGeneralTouch(uint16_t x, uint16_t y) {
     float cDisp = g_ceilingFt * altConv();
     g_units = (g_units + 1) % 3;
     g_radiusMi  = constrain(rDisp, 1.0f, 10.0f) / distConv();
-    g_ceilingFt = (int)roundf(constrain(cDisp, 3000.0f, 30000.0f) / altConv());
+    g_ceilingFt = (int)roundf(constrain(cDisp, 3000.0f, 99000.0f) / altConv());
     prefs.begin("flight", false);
     prefs.putInt("units", g_units);
     prefs.putFloat("radius", g_radiusMi);
@@ -835,7 +835,7 @@ void drawFtracker() {
     snprintf(rlbl, sizeof rlbl, "Radius (%s)", distUnit());
     snprintf(clbl, sizeof clbl, "Ceiling (%s)", altUnit());
     drawSlider(76, rlbl, g_radiusMi * distConv(), 1.0f, 10.0f, 0.5f, 1);
-    drawSlider(124, clbl, g_ceilingFt * altConv(), 3000, 30000, 1000, 0);
+    drawSlider(124, clbl, g_ceilingFt * altConv(), 3000, 99000, 1000, 0);
     drawSlider(172, "Poll (s)", (float)g_pollSec, 10, 300, 10, 0);
     tft.setTextFont(1);
     tft.setTextColor(TFT_LIGHTGREY, TFT_BLACK);
@@ -964,8 +964,8 @@ void handleFtrackerTouch(uint16_t x, uint16_t y) {
     // displayed unit and are stored in miles / feet.
     if      (rowMinus(x, y, 76))  { g_radiusMi  = constrain(g_radiusMi * distConv() - 0.5f, 1.0f, 10.0f) / distConv(); saveFloat("radius", g_radiusMi); }
     else if (rowPlus(x, y, 76))   { g_radiusMi  = constrain(g_radiusMi * distConv() + 0.5f, 1.0f, 10.0f) / distConv(); saveFloat("radius", g_radiusMi); }
-    else if (rowMinus(x, y, 124)) { g_ceilingFt = (int)roundf(constrain(g_ceilingFt * altConv() - 1000.0f, 3000.0f, 30000.0f) / altConv()); saveInt("ceiling", g_ceilingFt); }
-    else if (rowPlus(x, y, 124))  { g_ceilingFt = (int)roundf(constrain(g_ceilingFt * altConv() + 1000.0f, 3000.0f, 30000.0f) / altConv()); saveInt("ceiling", g_ceilingFt); }
+    else if (rowMinus(x, y, 124)) { g_ceilingFt = (int)roundf(constrain(g_ceilingFt * altConv() - 1000.0f, 3000.0f, 99000.0f) / altConv()); saveInt("ceiling", g_ceilingFt); }
+    else if (rowPlus(x, y, 124))  { g_ceilingFt = (int)roundf(constrain(g_ceilingFt * altConv() + 1000.0f, 3000.0f, 99000.0f) / altConv()); saveInt("ceiling", g_ceilingFt); }
     else if (rowMinus(x, y, 172)) { g_pollSec   = constrain(g_pollSec - 10, 10, 300);         saveInt("poll", g_pollSec); }
     else if (rowPlus(x, y, 172))  { g_pollSec   = constrain(g_pollSec + 10, 10, 300);         saveInt("poll", g_pollSec); }
     return;
