@@ -1,5 +1,13 @@
 # Changelog
 
+## [3.8.1](https://github.com/improving-minnesota/cyd-horizon/compare/v3.8.0...v3.8.1) (2026-09-19)
+
+
+### Bug Fixes
+
+* wildcard track refresh, keyboard caret, watch blip gating ([3a1f65b](https://github.com/improving-minnesota/cyd-horizon/commit/3a1f65b0906c041e38d30545b87bd85157d3da45))
+* wildcard track refresh, keyboard caret, watch blip gating ([dcd1749](https://github.com/improving-minnesota/cyd-horizon/commit/dcd1749ed5fd7d361c895a13434cef1b227413ea))
+
 ## [3.8.0](https://github.com/improving-minnesota/cyd-horizon/compare/v3.7.1...v3.8.0) (2026-09-19)
 
 
