@@ -1,5 +1,12 @@
 # Changelog
 
+## [3.8.3](https://github.com/improving-minnesota/cyd-horizon/compare/v3.8.2...v3.8.3) (2026-09-20)
+
+
+### Bug Fixes
+
+* suspend TLS arena during OTA so the download can complete ([#166](https://github.com/improving-minnesota/cyd-horizon/issues/166)) ([7e97524](https://github.com/improving-minnesota/cyd-horizon/commit/7e9752452df697255689689aaca5f335b290ea2e))
+
 ## [3.8.2](https://github.com/improving-minnesota/cyd-horizon/releases/tag/v3.8.2) (2026-09-20)
 
 
