@@ -20,6 +20,9 @@
 #define OTA_ASSET   "cyd-horizon-2432s028r.ino.bin"
 #endif
 #define OTA_API_URL "https://api.github.com/repos/" OTA_REPO "/releases/latest"
+// Hard cap on the whole body download (~1.3 MB image): healthy transfers finish
+// in tens of seconds; this still tolerates very slow links without hanging.
+#define OTA_DL_DEADLINE_MS (5UL * 60 * 1000)
 
 // ---- semver helpers -------------------------------------------------------
 int compareVersions(const String& a, const String& b) {
@@ -191,6 +194,18 @@ void drawOtaError(const char* msg) {
   delay(3000);
 }
 
+// Terminal failure page, drawn only when the TLS arena can't be rebuilt after
+// a failed OTA: no buttons, and the caller never returns - the device holds
+// this until power cycled rather than resume polling on a broken heap.
+void drawOtaRestartRequired() {
+  tft.fillScreen(TFT_BLACK);
+  tft.setTextColor(TFT_RED, TFT_BLACK); tft.setTextFont(2);
+  tft.setCursor(20, 88); tft.print("Update Failed");
+  tft.setTextColor(TFT_WHITE, TFT_BLACK);
+  tft.setCursor(20, 118); tft.print("Restart or power cycle");
+  tft.setCursor(20, 136); tft.print("the device to continue.");
+}
+
 // Download + flash on the dedicated task (TLS overflows loopTask). Owns the
 // display; reboots on success.
 static bool sha256Matches(const uint8_t hash[32], const String& expected) {
@@ -232,6 +247,17 @@ bool performOTA(const String& url, const String& version, const String& expected
     drawOtaHeader(version);          // reset screen + progress bar each attempt
     if (attempt > 1) delay(HTTPS_RETRY_DELAY_MS);
 
+    // Allocate the flash buffer BEFORE the request's TLS/lwIP churn: once the
+    // ~1.3 MB body starts streaming into RX pbufs, the internal heap can squeeze
+    // enough that Update.begin()'s 4 KB buffer alloc fails (returns err=0).
+    // Unknown size is safe: got/total + the SHA-256 digest still bound the
+    // transfer, and Update.end(true) finalizes a partial-length stream.
+    if (!Update.begin(OTA_SIZE_UNKNOWN, U_FLASH)) {
+      Serial.printf("[OTA] update failed: flash begin err=%d\n", Update.getError());
+      drawOtaError("Flash failed");
+      return false;
+    }
+
     HTTPClient http;
     http.setUserAgent(appUserAgent());   // persistent across begin()/end()
     bool connected = false;
@@ -263,6 +289,12 @@ bool performOTA(const String& url, const String& version, const String& expected
       if (code >= 300 && code < 400) {
         String nextUrl = http.getLocation();
         http.end();
+        // http.end() skips client.stop() when the peer already closed the
+        // socket (HTTPClient::disconnect early-outs on !connected()), which
+        // leaks the whole TLS context into the next hop's handshake and
+        // starves the arena. Tear down explicitly so each hop is truly serial.
+        if (useHttps) sec.stop();
+        if (dev) logHeapDiag("ota-hop");
         if (nextUrl.length() == 0) { code = -1; break; }
         requestUrl = nextUrl;
         continue;
@@ -270,11 +302,10 @@ bool performOTA(const String& url, const String& version, const String& expected
       break;
     }
     if (dev) Serial.printf("[OTA] attempt %d code=%d size=%d\n", attempt, code, http.getSize());
-    if (!connected || code != HTTP_CODE_OK) { http.end(); continue; }
+    if (!connected || code != HTTP_CODE_OK) { http.end(); if (useHttps) sec.stop(); Update.abort(); continue; }
 
     int total = http.getSize();
     bool haveTotal = (total > 0);
-    if (!Update.begin(haveTotal ? total : OTA_SIZE_UNKNOWN, U_FLASH)) { http.end(); drawOtaError("Flash failed"); return false; }
 
     mbedtls_sha256_context sha;
     mbedtls_sha256_init(&sha);
@@ -286,7 +317,12 @@ bool performOTA(const String& url, const String& version, const String& expected
     int lastPct = -1;
     bool done = false;
     unsigned long idleSince = millis();
+    const unsigned long dlStart = idleSince;
     while (!done) {
+      // Absolute deadline on top of the idle guard: a connection trickling a
+      // few bytes/minute keeps resetting idleSince and stalls the update
+      // indefinitely otherwise.
+      if (millis() - dlStart > OTA_DL_DEADLINE_MS) { failReason = "Download timeout"; break; }
       if (stream->available() == 0) {
         // If we already got the full announced body, finish even if connection stays open.
         if (haveTotal && got >= (size_t)total) { done = true; break; }
@@ -309,6 +345,7 @@ bool performOTA(const String& url, const String& version, const String& expected
     }
     if (dev) Serial.printf("[OTA] attempt %d got=%d total=%d\n", attempt, (int)got, total);
     http.end();
+    if (useHttps) sec.stop();   // same peer-closed leak as the redirect hop
 
     if (haveTotal && got < (size_t)total) { Update.abort(); failReason = "Download failed"; continue; }   // dropped mid-stream -> retry
 
@@ -321,7 +358,10 @@ bool performOTA(const String& url, const String& version, const String& expected
       Update.abort(); failReason = "Checksum mismatch"; continue;   // corrupted transfer -> retry
     }
 
-    if (!Update.end()) { drawOtaError("Flash failed"); return false; }
+    if (!Update.end(true)) {   // evenIfRemaining: _size came in as UNKNOWN
+      Serial.printf("[OTA] update failed: flash end err=%d\n", Update.getError());
+      drawOtaError("Flash failed"); return false;
+    }
     drawOtaRestart();
     delay(500);
     ESP.restart();

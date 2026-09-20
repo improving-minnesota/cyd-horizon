@@ -1030,9 +1030,12 @@ static void* tlsArenaCalloc(size_t n, size_t sz) {
     p = s_tlsHeap ? multi_heap_malloc(s_tlsHeap, bytes) : nullptr;
     if (!p) {
       p = heap_caps_calloc(n, sz, MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT);
-      s_tlsArenaMisses++;
-      if (isDevBuild()) Serial.printf("[tls] arena-miss size=%u free=%u\n", (unsigned)bytes,
-                                      s_tlsHeap ? (unsigned)multi_heap_free_size(s_tlsHeap) : 0);
+      // Not a "miss" while suspended - the arena is intentionally absent.
+      if (s_tlsHeap) {
+        s_tlsArenaMisses++;
+        if (isDevBuild()) Serial.printf("[tls] arena-miss size=%u free=%u\n", (unsigned)bytes,
+                                        (unsigned)multi_heap_free_size(s_tlsHeap));
+      }
     } else s_tlsArenaAllocs++;
   } else {
     p = heap_caps_calloc(n, sz, MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT);
@@ -1065,7 +1068,41 @@ static void tlsArenaFree(void* p) {
     heap_caps_free(p);
 }
 
+// ---- OTA heap hand-back ---------------------------------------------------
+// A TLS handshake needs ~60 KB from one heap; the split 40 KB arena + a
+// fragmented internal heap can't jointly supply it (ota-hop logs showed a
+// torn-down redirect hop still failing on intmax<1 KB / arenafree<1 KB). OTA
+// suspends the arena for the whole download - during OTA, TLS is the only
+// consumer, so the unified heap IS the guarantee the arena normally gives.
+// Callers must have every TLS client stopped first: a live context would
+// free() into an unregistered heap / a block already returned to the pool.
+static void tlsArenaSuspend() {
+  if (!s_tlsHeap) return;
+  mbedtls_platform_set_calloc_free(calloc, free);   // restore default allocator
+  // No multi_heap_unregister in this IDF rev; the heap control block lives in
+  // the block itself, so dropping the handle and freeing the block is enough
+  // (no allocations can be outstanding - netTask is paused and netBusy drained).
+  s_tlsHeap = nullptr;
+  heap_caps_free(s_tlsArena);
+  s_tlsArena = nullptr;
+}
 
+// Rebuild after a failed OTA. Not guaranteed: the post-OTA heap can be too
+// fragmented for a contiguous TLS_ARENA_BYTES block - callers must handle
+// false rather than let polling TLS run without its arena.
+static bool tlsArenaResume() {
+#ifdef OTA_TEST_RESUME_FAIL
+  return false;   // TEST: force the park path without a fragmented heap
+#endif
+  if (s_tlsHeap) return true;
+  s_tlsArena = (uint8_t*)heap_caps_malloc(TLS_ARENA_BYTES,
+                                          MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT);
+  if (!s_tlsArena) return false;
+  s_tlsHeap = multi_heap_register(s_tlsArena, TLS_ARENA_BYTES);
+  multi_heap_set_lock(s_tlsHeap, &s_tlsMux);
+  mbedtls_platform_set_calloc_free(tlsArenaCalloc, tlsArenaFree);
+  return true;
+}
 
 // How many connection attempts (and ms between them) a retrying HTTPS request
 // makes before giving up on a transport-layer failure. Mirrors the OTA retry.
@@ -1078,6 +1115,11 @@ static void tlsArenaFree(void* p) {
 // Verified-TLS request with transport retries: fresh connects can drop after
 // long uptime, so retry the whole begin()+request; any real HTTP reply ends it.
 // `headers` is nullptr-terminated - HTTPClient clears addHeader() on begin().
+// Live TLS client owned by netTask's current fetch, registered only for the
+// duration of the request so the OTA task can force-close a stalled socket
+// read. Cleared before return so it never outlives the caller's stack object.
+static NetworkClientSecure* volatile g_tlsInFlight = nullptr;
+
 int httpsRequestRetry(HTTPClient& http, NetworkClientSecure& sec, const char* url,
                       int method, const String& body, const char* const* headers,
                       bool allowInsecure) {
@@ -1087,8 +1129,12 @@ int httpsRequestRetry(HTTPClient& http, NetworkClientSecure& sec, const char* ur
   // Persistent per-client: setUserAgent() survives begin()/end(), unlike
   // addHeader(), so setting it here covers every request this helper makes.
   http.setUserAgent(appUserAgent());
+  g_tlsInFlight = &sec;
   int code = -1;
   for (int attempt = 1; attempt <= HTTPS_RETRY_ATTEMPTS; attempt++) {
+    // A queued OTA takes priority: don't burn further retries on a doomed
+    // fetch - the OTA task may also force-close this client to unblock us.
+    if (g_otaRunning) break;
     http.end();                // release any previous attempt's connection
     sec.stop();                // close the TLS socket cleanly
     if (attempt > 1) delay(HTTPS_RETRY_DELAY_MS);
@@ -1113,6 +1159,7 @@ int httpsRequestRetry(HTTPClient& http, NetworkClientSecure& sec, const char* ur
     Serial.printf("[tls] fail code=%d mbedtls=%d %s epoch=%ld\n",
                   code, mbedErr, tlsErr, (long)time(nullptr));
   }
+  g_tlsInFlight = nullptr;
   return code;
 }
 
@@ -3613,14 +3660,43 @@ void otaTaskEntry(void*) {
     // Draw "Updating" before any blocking network wait so the UI doesn't look frozen.
     drawOtaHeader(g_otaVersion);
     // Wait for in-flight net fetches: two tasks doing HTTP/lwIP at once can
-    // trip a FreeRTOS xTaskPriorityDisinherit assert.
-    while (netBusy) vTaskDelay(20);
+    // trip a FreeRTOS xTaskPriorityDisinherit assert. A fetch stalled in a
+    // socket read would hold OTA for its whole retry span, so after a grace
+    // period force-close its registered client - the read aborts, the fetch
+    // unwinds, and netBusy clears. stop() self-guards on an already-closed
+    // socket, so a raced cleanup on the net side is a no-op.
+    unsigned long busyWait = 0;
+    while (netBusy) {
+      if (busyWait >= 2000 && g_tlsInFlight) {
+        NetworkClientSecure* c = g_tlsInFlight;
+        g_tlsInFlight = nullptr;
+        c->stop();
+      }
+      vTaskDelay(20);
+      busyWait += 20;
+    }
+    // Hand the arena's 40 KB back to the general heap for the download: a TLS
+    // handshake wants ~60 KB from one place and the split arena + fragmented
+    // internal heap can't supply it. Every TLS client is stopped by now, so
+    // nothing can free() into the destroyed heap.
+    tlsArenaSuspend();
     performOTA(g_otaUrl, g_otaVersion, g_otaSha256);
-    // Only reached on failure (success reboots via ESP.restart()):
-    g_otaRunning = false;
-    g_screen = SCR_ABOUT;
-    g_updateState = 4;   // Update Check Failed
-    dirty = true;
+    // Only reached on failure (success reboots via ESP.restart()).
+    if (tlsArenaResume()) {
+      g_otaRunning = false;
+      g_screen = SCR_ABOUT;
+      g_updateState = 4;   // Update Check Failed
+      dirty = true;
+      continue;
+    }
+    // The post-OTA heap was too fragmented to rebuild the arena: every future
+    // TLS handshake would fail, so polling can't safely resume - but an
+    // auto-reboot would be mistaken for the success path. Park on a restart
+    // prompt instead: g_otaRunning stays set so loop() yields (no touch
+    // handling), netTask stays parked, and the idle return stays off. Only a
+    // power cycle rebuilds the arena cleanly.
+    drawOtaRestartRequired();
+    for (;;) vTaskDelay(1000 / portTICK_PERIOD_MS);
   }
 }
 
