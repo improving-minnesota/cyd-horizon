@@ -1,13 +1,17 @@
 # Changelog
 
-## [3.8.3](https://github.com/improving-minnesota/cyd-horizon/compare/v3.8.2...v3.8.3) (2026-09-20)
+## [3.8.3](https://github.com/improving-minnesota/cyd-horizon/releases/tag/v3.8.3) (2026-09-20)
 
 
 ### Bug Fixes
 
 * suspend TLS arena during OTA so the download can complete ([#166](https://github.com/improving-minnesota/cyd-horizon/issues/166)) ([7e97524](https://github.com/improving-minnesota/cyd-horizon/commit/7e9752452df697255689689aaca5f335b290ea2e))
 
-## [3.8.2](https://github.com/improving-minnesota/cyd-horizon/releases/tag/v3.8.2) (2026-09-20)
+## 3.8.2 (2026-09-20) — **REMOVED**
+
+> Release and tag withdrawn: GitHub OTA could not complete - the TLS arena
+> plus a fragmented heap starved the post-redirect handshake, so the download
+> stalled or failed. Fixed in 3.8.3.
 
 
 ### Bug Fixes
@@ -18,7 +22,7 @@
 
 > Release and tag withdrawn: an OpenSky token TLS failure could fall back to
 > anonymous access, burn the anonymous credit bucket, and latch "No Flight
-> Credits" until reboot. Fixed in 3.8.2.
+> Credits" until reboot. Fixed in 3.8.3.
 
 
 ### Bug Fixes
@@ -29,7 +33,7 @@
 ## 3.8.0 (2026-09-19) — **REMOVED**
 
 > Release and tag withdrawn: same OpenSky anonymous-fallback defect as 3.8.1.
-> Fixed in 3.8.2.
+> Fixed in 3.8.3.
 
 
 ### Features
