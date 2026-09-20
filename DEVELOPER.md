@@ -514,6 +514,66 @@ its actual host. Firmware integrity is independently pinned:
 `digest` from the GitHub API before flashing (an empty digest skips the check).
 A mismatch aborts the update without touching the running slot.
 
+**TLS heap arena.** An mbedTLS handshake peaks at ~60–70 KB total (two ~16.7 KB
+record buffers — `MBEDTLS_SSL_MAX_CONTENT_LEN=16384` is compiled into the
+shipped libs — plus certificate parsing and RSA workspace) — the app's largest
+contiguous need and its biggest alloc/free churner. On a PSRAM-less board, long
+uptimes fragment the main heap until a big record-buffer alloc can't find a
+contiguous block; connects then fail and only a reboot recovers (the ESP-IDF
+heap has no compaction). `setup()` therefore installs a private arena:
+`mbedtls_platform_set_calloc_free()` routes mbedTLS allocations **≥4 KB** into
+a 40 KB block managed by `multi_heap` (`s_tlsArena` in `cyd-horizon.ino`),
+while smaller allocations stay on the main heap. Each side falls back to the
+other on failure, so a miss never fails outright.
+
+Size-routing matters: the *whole* handshake does not fit in a 40–56 KB arena
+(the CA-bundle parse alone is ~8–16 KB of small allocs), and oversizing the
+arena starves WiFi RX pbufs — which is what stalled OTA downloads mid-stream.
+The arena only needs to guarantee the big, fragmentation-sensitive buffers;
+small allocs tolerate a fragmented heap. It's `heap_caps_malloc`'d once at boot
+(a static array overflows `dram0_0`); the stock core ships
+`MBEDTLS_PLATFORM_MEMORY` enabled so the runtime hook needs no rebuilt
+libraries. TLS is serialized by design (one fetch at a time; the OTA task waits
+on `netBusy`), so the arena only ever serves one connection; a `portMUX_TYPE`
+spinlock guards the multi_heap (a FreeRTOS semaphore is NOT interchangeable —
+it deadlocks). Dev builds log `arenafree=` around each TLS attempt plus
+`arena-miss`/`both-fail` diagnostics.
+
+**ISRG bundle contents** (`kIsrgRootCAs`, four anchors):
+
+| Cert | Role |
+|---|---|
+| ISRG Root X1 | Anchors classic chains (leaf → R10–R14/E5–E9 → X1) *and* Gen-Y chains that cross-sign Root YR/YE under X1 |
+| ISRG Root X2 | ECDSA root — anchors chains that terminate at X2 |
+| Root YR (self-signed) | Anchors a bare Gen-Y RSA chain served *without* the X1 cross-sign |
+| Root YE (self-signed) | Same for Gen-Y ECDSA |
+
+Deliberately **omitted** — servers send these on the wire, so bundling them
+only costs handshake-parse heap (~2 KB per cert) with no coverage gain: the
+X1/YR and X1/YE *cross-signed* root variants, and intermediates (YR1/YR2,
+YE1/YE2, R10–R14, E5–E9). An intermediate must never be bundled as a trust
+anchor for a host whose chain already terminates at a real root — it just
+adds parse cost. (One exception exists in `kGlobalSignEccRootCAs`: the WE1
+intermediate is bundled because that server sometimes omits it.)
+
+**Refreshing the bundle.** Get canonical PEMs from Let's Encrypt's
+[certificate pages](https://letsencrypt.org/certificates/) (chains section
+lists self-signed roots and cross-signs — take the *self-signed* roots only).
+To check what a live host actually serves:
+
+```sh
+openssl s_client -connect auth.opensky-network.org:443 -servername auth.opensky-network.org -showcerts </dev/null
+```
+
+Extract each `BEGIN/END CERTIFICATE` block and inspect with
+`openssl x509 -noout -subject -issuer -dates`. If the chain ends at a root not
+in `kIsrgRootCAs`, add that self-signed root — not the cross-signed variant,
+not the intermediate. On-device verification (dev builds): the probe logs the
+served chain and runs `mbedtls_x509_crt_verify()` against the bundle; `ret=0
+flags=0x0` is success, `flags=0x8` (`NOT_TRUSTED`) means the anchor is missing
+or the heap is too starved to finish parsing — check `arena-miss`/`both-fail`
+counters before assuming the bundle is wrong.
+
 ### HTTP body streaming and JSON parsing
 
 Large OpenSky responses (`/states/all`, `/tracks/all`) are no longer fully
@@ -1048,8 +1108,23 @@ The periodic flight poll is gated **only** by the Radar Polling bucket: while th
 `/states/*` credits are exhausted, the normal poll cadence backs off to a
 15-minute recovery check (`CREDIT_RECOVERY_MS` in `cyd-horizon.ino`) so the
 device notices once the credits refill (OpenSky resets daily) without hammering
-the API. The Route Lookup and Flight Tracking buckets don't affect the poll
-cadence.
+the API. Each backed-off attempt **re-arms the deadline before firing** — a
+failed recheck (TLS/HTTP error, dead link) must not leave `g_nextRadarMs` in
+the past or the poll would re-fire every loop iteration; a `429` still
+overrides the deadline with the server's `X-Rate-Limit-Retry-After-Seconds`.
+A `200` that arrives *without* `X-Rate-Limit-Remaining` clears the exhausted
+flag — a served response contradicts it, and a truly empty bucket re-latches
+via `429` on the next poll. The Route Lookup and Flight Tracking buckets don't
+affect the poll cadence.
+
+Anonymous polling is used **only** when no OpenSky credentials are configured:
+the anonymous bucket is 400/day keyed by source IP, so every device on a LAN
+shares it — a token-mint failure that silently fell back to anonymous used to
+burn that bucket and latch "No Flight Credits" for hours while the
+authenticated bucket was untouched. When credentials are configured but the
+token mint fails transiently (TLS/5xx/429), the states request is skipped for
+that cycle and the poll retries normally; a mint rejected with 400/401 counts
+toward the `AUTH_401_BACKOFF_AFTER` streak like a rejected request.
 
 `fetchRoute()` and `fetchTrack()` (both in `flight_details.ino`) are only called
 for the closest overhead plane (`planes[0]` when `distMi <= g_radiusMi`), and

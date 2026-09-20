@@ -25,3 +25,4 @@ cyd-horizon/build/
 
 # macOS
 .DS_Store
+logs/
