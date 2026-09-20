@@ -1,5 +1,12 @@
 # Changelog
 
+## [3.8.2](https://github.com/improving-minnesota/cyd-horizon/compare/v3.8.1...v3.8.2) (2026-09-20)
+
+
+### Bug Fixes
+
+* OpenSky credit-backoff recovery and TLS heap arena ([#161](https://github.com/improving-minnesota/cyd-horizon/issues/161)) ([e5773f2](https://github.com/improving-minnesota/cyd-horizon/commit/e5773f2a9362f5b4fdb30a2aeffb569d04914a1e))
+
 ## [3.8.1](https://github.com/improving-minnesota/cyd-horizon/compare/v3.8.0...v3.8.1) (2026-09-19)
 
 
