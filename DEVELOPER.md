@@ -514,6 +514,27 @@ its actual host. Firmware integrity is independently pinned:
 `digest` from the GitHub API before flashing (an empty digest skips the check).
 A mismatch aborts the update without touching the running slot.
 
+**TLS heap arena.** An mbedTLS handshake peaks at ~40–50 KB of heap (two ~16 KB
+record buffers, certificate parsing, bignum) — the app's largest contiguous
+allocation and its biggest alloc/free churner. On a PSRAM-less board, long
+uptimes fragment the main heap until the 16 KB record buffer can't find a
+contiguous block; every connect then fails `HTTPClient` `-1` and only a reboot
+recovers (the ESP-IDF heap has no compaction). `setup()` therefore installs a
+private arena: `mbedtls_platform_set_calloc_free()` routes every mbedTLS
+allocation into a 56 KB block managed by `multi_heap` (`s_tlsArena` in
+`cyd-horizon.ino`). It's `heap_caps_malloc`'d once at boot — a static array
+would overflow the ESP32's `dram0_0` .bss segment, and boot-time heap is
+clean so the block is guaranteed contiguous. The stock core ships
+`MBEDTLS_PLATFORM_MEMORY` enabled, so
+the runtime hook needs no rebuilt libraries. Handshakes are immune to
+main-heap fragmentation and TLS churn never touches the main heap. If the
+arena is ever exhausted, the allocator falls back to `heap_caps_calloc` (main
+heap); frees are routed back by pointer-range check. TLS sessions are
+serialized by design (one fetch at a time; the OTA task waits on `netBusy`),
+so the arena only ever serves one connection; a recursive mutex guards the
+multi_heap anyway. Dev builds log `arenafree=` around each TLS attempt so the
+arena's headroom is observable.
+
 ### HTTP body streaming and JSON parsing
 
 Large OpenSky responses (`/states/all`, `/tracks/all`) are no longer fully
@@ -1048,8 +1069,14 @@ The periodic flight poll is gated **only** by the Radar Polling bucket: while th
 `/states/*` credits are exhausted, the normal poll cadence backs off to a
 15-minute recovery check (`CREDIT_RECOVERY_MS` in `cyd-horizon.ino`) so the
 device notices once the credits refill (OpenSky resets daily) without hammering
-the API. The Route Lookup and Flight Tracking buckets don't affect the poll
-cadence.
+the API. Each backed-off attempt **re-arms the deadline before firing** — a
+failed recheck (TLS/HTTP error, dead link) must not leave `g_nextRadarMs` in
+the past or the poll would re-fire every loop iteration; a `429` still
+overrides the deadline with the server's `X-Rate-Limit-Retry-After-Seconds`.
+A `200` that arrives *without* `X-Rate-Limit-Remaining` clears the exhausted
+flag — a served response contradicts it, and a truly empty bucket re-latches
+via `429` on the next poll. The Route Lookup and Flight Tracking buckets don't
+affect the poll cadence.
 
 `fetchRoute()` and `fetchTrack()` (both in `flight_details.ino`) are only called
 for the closest overhead plane (`planes[0]` when `distMi <= g_radiusMi`), and

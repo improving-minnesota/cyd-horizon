@@ -18,6 +18,9 @@
 #include "esp_sntp.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
+#include "freertos/semphr.h"
+#include "mbedtls/platform.h"
+#include "multi_heap.h"
 #include <malloc.h>  // malloc_usable_size
 // Logos load at runtime from a LittleFS partition (logos.ino); declared here
 // so Arduino's alphabetical .ino concat can't hide them from other files.
@@ -1071,6 +1074,42 @@ void logHeapDiag(const char* why) {
                 (unsigned)psramFree, (unsigned)psramTotal, g_lat, g_lon, g_radiusMi);
 }
 
+// ---- TLS heap arena ----
+// An mbedTLS handshake peaks at ~40-50KB of heap (two ~16KB record buffers,
+// cert parsing, bignum) - the largest contiguous need in the app and its
+// biggest churner. Long uptimes fragment the main heap until the handshake's
+// 16KB record alloc can't find a contiguous block and every connect fails -1;
+// the heap has no compaction, so only a reboot recovered. The stock core
+// compiles MBEDTLS_PLATFORM_MEMORY in (CONFIG_MBEDTLS_CUSTOM_MEM_ALLOC unset
+// only picks the DEFAULT allocator), so mbedtls_platform_set_calloc_free()
+// routes every mbedTLS alloc into this private arena instead: handshakes are
+// immune to main-heap fragmentation and TLS churn never touches the main heap.
+// TLS is serialized by design (one fetch at a time; the OTA task waits on
+// netBusy), so the arena only ever serves one connection.
+// Heap-allocated once at boot (not .bss - a static array overflows the ESP32's
+// dram0_0 segment). Boot-time heap is clean, so the 56KB block is contiguous.
+#define TLS_ARENA_BYTES (56 * 1024)
+static uint8_t* s_tlsArena = nullptr;
+static multi_heap_handle_t s_tlsHeap = nullptr;
+
+static void* tlsArenaCalloc(size_t n, size_t sz) {
+  void* p = s_tlsHeap ? multi_heap_malloc(s_tlsHeap, n * sz) : nullptr;
+  if (p) memset(p, 0, n * sz);   // multi_heap_malloc doesn't zero
+  // Arena exhausted -> degrade to the main heap (pre-arena behavior).
+  else p = heap_caps_calloc(n, sz, MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT);
+  return p;
+}
+
+// The fallback above means a pointer can come from either heap - range-check
+// the address to route the free correctly.
+static void tlsArenaFree(void* p) {
+  if (!p) return;
+  if ((uint8_t*)p >= s_tlsArena && (uint8_t*)p < s_tlsArena + TLS_ARENA_BYTES)
+    multi_heap_free(s_tlsHeap, p);
+  else
+    heap_caps_free(p);
+}
+
 // How many connection attempts (and ms between them) a retrying HTTPS request
 // makes before giving up on a transport-layer failure. Mirrors the OTA retry.
 #define HTTPS_RETRY_ATTEMPTS 3
@@ -1097,9 +1136,10 @@ int httpsRequestRetry(HTTPClient& http, NetworkClientSecure& sec, const char* ur
     sec.stop();                // close the TLS socket cleanly
     if (attempt > 1) delay(HTTPS_RETRY_DELAY_MS);
     if (isDevBuild()) {
-      Serial.printf("[tls] pre attempt=%d intfree=%u intmax=%u\n", attempt,
+      Serial.printf("[tls] pre attempt=%d intfree=%u intmax=%u arenafree=%u\n", attempt,
                     (unsigned)heap_caps_get_free_size(MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT),
-                    (unsigned)heap_caps_get_largest_free_block(MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT));
+                    (unsigned)heap_caps_get_largest_free_block(MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT),
+                    s_tlsHeap ? (unsigned)multi_heap_free_size(s_tlsHeap) : 0);
     }
     if (!httpsBegin(http, sec, url, allowInsecure)) continue;   // connect failed -> retry
     if (headers) {
@@ -1384,6 +1424,10 @@ void fetchFlights() {
     g_creditsRemaining = rem.toInt();
     g_creditsKnown = true;
     g_creditsExhausted = (g_creditsRemaining <= LOW_CREDIT_THRESHOLD);
+  } else {
+    // A served response without the header contradicts a latched "exhausted" -
+    // a truly empty bucket 429s on the next poll and re-latches anyway.
+    g_creditsExhausted = false;
   }
   // Stream-parse states[] one row at a time - buffering it all would eat the
   // contiguous heap the next TLS handshake needs (we only keep MAXP planes).
@@ -3153,6 +3197,28 @@ void handleTouch() {
 // ---- Program setup ----
 void setup() {
   Serial.begin(115200);
+  // Install the TLS arena before anything can use mbedTLS (hook is
+  // process-global). multi_heap is lockless by default; a recursive mutex
+  // keeps it safe if TLS is ever driven from two tasks.
+  {
+    s_tlsArena = (uint8_t*)heap_caps_malloc(TLS_ARENA_BYTES,
+                                           MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT);
+    if (s_tlsArena) {
+      static SemaphoreHandle_t tlsHeapLock = xSemaphoreCreateRecursiveMutex();
+      s_tlsHeap = multi_heap_register(s_tlsArena, TLS_ARENA_BYTES);
+      multi_heap_set_lock(s_tlsHeap, tlsHeapLock);
+      mbedtls_platform_set_calloc_free(tlsArenaCalloc, tlsArenaFree);
+    }
+    if (isDevBuild()) {
+      void* probe = tlsArenaCalloc(1, 1024);
+      bool inArena = probe && s_tlsArena &&
+                     (uint8_t*)probe >= s_tlsArena &&
+                     (uint8_t*)probe < s_tlsArena + TLS_ARENA_BYTES;
+      tlsArenaFree(probe);
+      Serial.printf("[tls] arena %uKB reg=%d probe_in_arena=%d\n",
+                    TLS_ARENA_BYTES / 1024, (int)(s_tlsHeap != nullptr), (int)inArena);
+    }
+  }
   prefs.begin("flight", false);
 #if ENABLE_SERIAL_PROVISION
   serialProvision();   // optional: import KEY=VALUE credentials from USB serial into NVS
@@ -3667,7 +3733,13 @@ void loop() {
       // Both an exhausted credit bucket and a run of rejected tokens park the
       // next attempt in g_nextRadarMs; honor it instead of the normal cadence.
       if (g_creditsExhausted || g_auth401Streak >= AUTH_401_BACKOFF_AFTER) {
-        if ((long)(now - g_nextRadarMs) >= 0) wantFlights = true;
+        if ((long)(now - g_nextRadarMs) >= 0) {
+          // Re-arm before firing: a failed fetch must not leave the deadline
+          // in the past, or the poll re-fires every loop until it clears.
+          // A 429 still overrides this with the server's Retry-After.
+          g_nextRadarMs = now + CREDIT_RECOVERY_MS;
+          wantFlights = true;
+        }
       } else if (now - lastPoll >= (unsigned long)g_pollSec * 1000UL) {
         wantFlights = true;
       }
