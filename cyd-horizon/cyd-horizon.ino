@@ -871,61 +871,8 @@ static const char* const kIsrgRootCAs =
   "LdL1VQKs9BdV81r76eXRB6mtjuNjzk6/lBsPNToWLTDzGYgtQKO1jl63uAIwGV7m\n"
   "onyF377c+MM1oqVNs17sgu7F9YKZwgLmVbeOMDbKAXHtKMDLbiGllCcs8f47\n"
   "-----END CERTIFICATE-----\n"
-  //
-  // [5] Root YR
-  "-----BEGIN CERTIFICATE-----\n"
-  "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\n"
-  "-----END CERTIFICATE-----\n"
-  //
-  // [6] Root YE
-  "-----BEGIN CERTIFICATE-----\n"
-  "MIICpjCCAiugAwIBAgIRAIchZfw0tuX7qK3Vs3BftTowCgYIKoZIzj0EAwMwTzEL\n"
-  "MAkGA1UEBhMCVVMxKTAnBgNVBAoTIEludGVybmV0IFNlY3VyaXR5IFJlc2VhcmNo\n"
-  "IEdyb3VwMRUwEwYDVQQDEwxJU1JHIFJvb3QgWDIwHhcNMjYwNTEzMDAwMDAwWhcN\n"
-  "MzIwOTAyMjM1OTU5WjAuMQswCQYDVQQGEwJVUzENMAsGA1UEChMESVNSRzEQMA4G\n"
-  "A1UEAxMHUm9vdCBZRTB2MBAGByqGSM49AgEGBSuBBAAiA2IABDwS/6vhrcVqcbBo\n"
-  "+wgdI3fwn9x7DNJJOY/lTOti0vkwuRN87RhEhTH17E7XyFjWsPYhIPt/wzOqxTd2\n"
-  "b+4ZJNy9ID04YywF9U5zasDVyGSNErVNtz8uSGh5izW87j77GaOB6zCB6DAOBgNV\n"
-  "HQ8BAf8EBAMCAQYwEwYDVR0lBAwwCgYIKwYBBQUHAwEwDwYDVR0TAQH/BAUwAwEB\n"
-  "/zAdBgNVHQ4EFgQUo8gmWo6hTNA1Y/ybI8g6rlbzT1YwHwYDVR0jBBgwFoAUfEKW\n"
-  "rt5LSDv6kviejM9ti6lyN5UwMgYIKwYBBQUHAQEEJjAkMCIGCCsGAQUFBzAChhZo\n"
-  "dHRwOi8veDIuaS5sZW5jci5vcmcvMBMGA1UdIAQMMAowCAYGZ4EMAQIBMCcGA1Ud\n"
-  "HwQgMB4wHKAaoBiGFmh0dHA6Ly94Mi5jLmxlbmNyLm9yZy8wCgYIKoZIzj0EAwMD\n"
-  "aQAwZgIxAMU19WCtmxVND8UHBZRoma49Z7jPs64Dma0eTu1OChVbB/2J7GV3nvYK\n"
-  "Ax54uk1G9QIxAO0miLVJu8PLNiXXXkiE/gsK3CTRTF/aeo4bMX42Zw40csRU6AC2\n"
-  "6hSW1/IWaas6dg==\n"
-  "-----END CERTIFICATE-----\n"
+  // Cross-signed variants of Root YR/YE are intentionally omitted: LE servers
+  // send them on the wire, and anchoring at X1/X2 or the bare roots covers both.
   //
   // [7] ISRG Root X2
   "-----BEGIN CERTIFICATE-----\n"
@@ -941,36 +888,6 @@ static const char* const kIsrgRootCAs =
   "zj0EAwMDaAAwZQIwe3lORlCEwkSHRhtFcP9Ymd70/aTSVaYgLXTWNLxBo1BfASdW\n"
   "tL4ndQavEi51mI38AjEAi/V3bNTIZargCyzuFJ0nN6T5U6VR5CmD1/iQMVtCnwr1\n"
   "/q4AaOeMSQ+2b1tbFfLn\n"
-  "-----END CERTIFICATE-----\n"
-  //
-  // [8] YR1
-  "-----BEGIN CERTIFICATE-----\n"
-  "MIIE2zCCAsOgAwIBAgIRAKICU/FfJpHAXcHOE7m8yk4wDQYJKoZIhvcNAQELBQAw\n"
-  "LjELMAkGA1UEBhMCVVMxDTALBgNVBAoTBElTUkcxEDAOBgNVBAMTB1Jvb3QgWVIw\n"
-  "HhcNMjUwOTAzMDAwMDAwWhcNMjgwOTAyMjM1OTU5WjAzMQswCQYDVQQGEwJVUzEW\n"
-  "MBQGA1UEChMNTGV0J3MgRW5jcnlwdDEMMAoGA1UEAxMDWVIxMIIBIjANBgkqhkiG\n"
-  "9w0BAQEFAAOCAQ8AMIIBCgKCAQEAoVi8X2xCYgMXvJxNPKp/oF13UMgmPABB07VC\n"
-  "LNDtoXmt9luEZNJSBV10VyT1Pz6LD8Zq1d2gc43WNl1AdRrj4sEnazbOiz0nPpmG\n"
-  "Bp2hui49oZtDIY6wdKeZAi5BbNU20CH6RSBBMLSQ9cXrH8dxdv4PAJ45ssGML68U\n"
-  "SE3BsjC2a6cAN9L5CgXVIQi5tfNiTPoFZZ3S0OlXqLmmtdV95udWAb5b6e/F49Di\n"
-  "CsH0Y00Ag72BVIb1hzynmKe+X0mERBTtsb3BwmpV9ipeBjMLoR/D9cHxHQCWoi5l\n"
-  "TmXwY015J5rGelz1nZjJuxc2kioaX29XJBnhMkP531rSdG5uMwIDAQABo4HuMIHr\n"
-  "MA4GA1UdDwEB/wQEAwIBhjATBgNVHSUEDDAKBggrBgEFBQcDATASBgNVHRMBAf8E\n"
-  "CDAGAQH/AgEAMB0GA1UdDgQWBBQfLzW+RhSCzUCxrnksVXj699Ro+zAfBgNVHSME\n"
-  "GDAWgBTe51tg0CJtQCh9Pw0B/qS1UrRRlDAyBggrBgEFBQcBAQQmMCQwIgYIKwYB\n"
-  "BQUHMAKGFmh0dHA6Ly95ci5pLmxlbmNyLm9yZy8wEwYDVR0gBAwwCjAIBgZngQwB\n"
-  "AgEwJwYDVR0fBCAwHjAcoBqgGIYWaHR0cDovL3lyLmMubGVuY3Iub3JnLzANBgkq\n"
-  "hkiG9w0BAQsFAAOCAgEA0+zvMq3kHig1ddTmmm+RibTr9/RpX7k4buanMMRqbV/y\n"
-  "IvP82zAHN3mvaw+cASuVsdpd0ikjhr4hnhJQLQOzOp2ccKrsdGOAgo0vddeISFAq\n"
-  "EWEV4lmUM3vFF796up+bSgmJ1u6RupDCMxDgF8M3eLvGuj6L0lu3zkQ0KuQLnKxL\n"
-  "tB0oQqn1Idg5CuuGpMvQzk29Pa3D/qHurc0EIM9SxukQuJqq63lxsYyRQFU8yMBO\n"
-  "hq1w5LbfaWNRrz1uklOfI/pYkAb2E2MTZrAMQkBIE2S8Jt1F8gRc96o/xOsrgvSk\n"
-  "a84AisX6xq1lz1Z7jGvrnXc4TMcjxZTjiTaihcYI1JIXZiLtEMSCa5l3cu8YWd6z\n"
-  "dLRQlqRdclVjuQfNHawRJ6GWlkK0QJosivTKwdBw3KxEtzGo8yMHERbsy57gP1UX\n"
-  "HOMcmZYQC0gtyR3SxfenIM/MxC3Ia2Ypab/kQ/CTnlIn2KQ5JUC6NYrGCbhFN9bp\n"
-  "5lKJStEwCUnLpntcrXk5XVDCNv/5RyWpRThkGOV7GetKkQ0qAY8hCzWK6oqnAhDZ\n"
-  "cjlYVdWfqOw3DIOX6EDNBgAqHarRVxyF9QZdOaXSyPJ0ueD2BYJEBgaCGQ8rAaU/\n"
-  "Qc123V5LTXDZW4CcsPBDyhy4v+c8hClAyw/IkJlfBqxB9D+/wvIMHgECZ4ptP6o=\n"
   "-----END CERTIFICATE-----\n";
 
 
@@ -1082,21 +999,58 @@ void logHeapDiag(const char* why) {
 // the heap has no compaction, so only a reboot recovered. The stock core
 // compiles MBEDTLS_PLATFORM_MEMORY in (CONFIG_MBEDTLS_CUSTOM_MEM_ALLOC unset
 // only picks the DEFAULT allocator), so mbedtls_platform_set_calloc_free()
-// routes every mbedTLS alloc into this private arena instead: handshakes are
+// routes mbedTLS's big allocs into this private arena instead: handshakes are
 // immune to main-heap fragmentation and TLS churn never touches the main heap.
 // TLS is serialized by design (one fetch at a time; the OTA task waits on
 // netBusy), so the arena only ever serves one connection.
 // Heap-allocated once at boot (not .bss - a static array overflows the ESP32's
-// dram0_0 segment). Boot-time heap is clean, so the 56KB block is contiguous.
-#define TLS_ARENA_BYTES (56 * 1024)
+// dram0_0 segment). Boot-time heap is clean, so the block is contiguous.
+// Size-routed: the arena's job is to guarantee contiguity for the allocations
+// that need it - the two ~16.7KB ssl I/O buffers (SSL_MAX_CONTENT_LEN=16K is
+// compiled into the shipped libs). Everything smaller tolerates fragmentation,
+// so it goes to the main heap; holding ~64KB of small allocs would need an
+// arena bigger than the RAM we can spare.
+#define TLS_ARENA_BYTES   (40 * 1024)
+#define TLS_ARENA_MIN     4096    // >= this routes to the arena first
 static uint8_t* s_tlsArena = nullptr;
 static multi_heap_handle_t s_tlsHeap = nullptr;
+// multi_heap's lock must be a portMUX spinlock (re-entrant per-core), not a
+// FreeRTOS mutex - a semaphore handle is dereferenced as a spinlock word and
+// spins forever in spinlock_acquire().
+static portMUX_TYPE s_tlsMux = portMUX_INITIALIZER_UNLOCKED;
+
+static unsigned s_tlsArenaAllocs = 0, s_tlsArenaMisses = 0;   // dev diagnostics
 
 static void* tlsArenaCalloc(size_t n, size_t sz) {
-  void* p = s_tlsHeap ? multi_heap_malloc(s_tlsHeap, n * sz) : nullptr;
-  if (p) memset(p, 0, n * sz);   // multi_heap_malloc doesn't zero
-  // Arena exhausted -> degrade to the main heap (pre-arena behavior).
-  else p = heap_caps_calloc(n, sz, MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT);
+  size_t bytes = n * sz;
+  // Big allocs prefer the arena; small allocs prefer the heap. Either side
+  // falls back to the other on failure so a miss never fails outright.
+  void* p;
+  if (bytes >= TLS_ARENA_MIN) {
+    p = s_tlsHeap ? multi_heap_malloc(s_tlsHeap, bytes) : nullptr;
+    if (!p) {
+      p = heap_caps_calloc(n, sz, MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT);
+      s_tlsArenaMisses++;
+      if (isDevBuild()) Serial.printf("[tls] arena-miss size=%u free=%u\n", (unsigned)bytes,
+                                      s_tlsHeap ? (unsigned)multi_heap_free_size(s_tlsHeap) : 0);
+    } else s_tlsArenaAllocs++;
+  } else {
+    p = heap_caps_calloc(n, sz, MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT);
+    if (!p && s_tlsHeap) {
+      p = multi_heap_malloc(s_tlsHeap, bytes);   // heap too fragmented for even this
+      if (p) s_tlsArenaAllocs++;
+      else if (isDevBuild())
+        Serial.printf("[tls] both-fail size=%u caller=%p intfree=%u intmax=%u arenafree=%u\n",
+                      (unsigned)bytes, __builtin_return_address(0),
+                      (unsigned)heap_caps_get_free_size(MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT),
+                      (unsigned)heap_caps_get_largest_free_block(MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT),
+                      (unsigned)multi_heap_free_size(s_tlsHeap));
+    }
+  }
+  // multi_heap_malloc doesn't zero; heap_caps_calloc already does.
+  if (p && s_tlsArena && (uint8_t*)p >= s_tlsArena &&
+      (uint8_t*)p < s_tlsArena + TLS_ARENA_BYTES)
+    memset(p, 0, bytes);
   return p;
 }
 
@@ -1104,10 +1058,38 @@ static void* tlsArenaCalloc(size_t n, size_t sz) {
 // the address to route the free correctly.
 static void tlsArenaFree(void* p) {
   if (!p) return;
-  if ((uint8_t*)p >= s_tlsArena && (uint8_t*)p < s_tlsArena + TLS_ARENA_BYTES)
+  if (s_tlsArena && (uint8_t*)p >= s_tlsArena &&
+      (uint8_t*)p < s_tlsArena + TLS_ARENA_BYTES)
     multi_heap_free(s_tlsHeap, p);
   else
     heap_caps_free(p);
+}
+
+// OTA needs the heap back: netTask is paused while g_otaRunning and the OTA
+// task waits on netBusy, so no TLS can be in flight - but WiFi RX pbufs are
+// allocated from internal heap, and 56KB parked in the arena starves them
+// (RX drops -> TCP stalls -> the 20s HTTP timeout kills the download).
+// Suspend hands the block back for the download; resume re-acquires it if the
+// OTA fails (success reboots, which re-inits the arena anyway).
+static void tlsArenaSuspend() {
+  if (!s_tlsHeap) return;
+  mbedtls_platform_set_calloc_free(calloc, free);   // restore default allocator
+  // No multi_heap_unregister in this IDF rev; the heap control block lives in
+  // the block itself, so dropping the handle and freeing the block is enough
+  // (no allocations can be outstanding - netTask is paused and netBusy drained).
+  s_tlsHeap = nullptr;
+  heap_caps_free(s_tlsArena);
+  s_tlsArena = nullptr;
+}
+
+static void tlsArenaResume() {
+  if (s_tlsHeap) return;
+  s_tlsArena = (uint8_t*)heap_caps_malloc(TLS_ARENA_BYTES,
+                                          MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT);
+  if (!s_tlsArena) return;
+  s_tlsHeap = multi_heap_register(s_tlsArena, TLS_ARENA_BYTES);
+  multi_heap_set_lock(s_tlsHeap, &s_tlsMux);
+  mbedtls_platform_set_calloc_free(tlsArenaCalloc, tlsArenaFree);
 }
 
 // How many connection attempts (and ms between them) a retrying HTTPS request
@@ -1153,7 +1135,8 @@ int httpsRequestRetry(HTTPClient& http, NetworkClientSecure& sec, const char* ur
   if (code < 0 && isDevBuild()) {
     char tlsErr[128] = {};
     int mbedErr = sec.lastError(tlsErr, sizeof tlsErr);
-    Serial.printf("[tls] fail code=%d mbedtls=%d %s\n", code, mbedErr, tlsErr);
+    Serial.printf("[tls] fail code=%d mbedtls=%d %s epoch=%ld\n",
+                  code, mbedErr, tlsErr, (long)time(nullptr));
   }
   return code;
 }
@@ -1208,6 +1191,95 @@ void getRouteDisplay(String& origin, String& originCity, String& dest, String& d
   hasData = (origin.length() || dest.length() || g_adsbRouteFetched || g_routeFetched);
 }
 
+// Dev diagnostic: expose the ssl_ctx so a probe can read the peer chain after
+// an insecure connect (verify state is torn down by the time a failed
+// handshake returns, so post-mortem flags read 0xffffffff and tell us nothing).
+class DiagClientSecure : public NetworkClientSecure {
+public:
+  mbedtls_ssl_context* ctx() { return sslclient ? &sslclient->ssl_ctx : nullptr; }
+};
+
+// mbedTLS verify callback: called per chain cert with that cert's flags, so a
+// NOT_TRUSTED result shows exactly which link failed.
+static int tlsVrfyCb(void*, mbedtls_x509_crt* crt, int depth, uint32_t* flags) {
+  char s[96], vb[128];
+  mbedtls_x509_dn_gets(s, sizeof s, &crt->subject);
+  mbedtls_x509_crt_verify_info(vb, sizeof vb, "", *flags);
+  Serial.printf("[tls] vrfy depth=%d flags=0x%lx subj=%s :%s\n",
+                depth, (unsigned long)*flags, s, vb);
+  return 0;
+}
+
+// Dev-only: connect insecure (handshake completes regardless of cert checks),
+// copy the served chain, DISCONNECT, then verify the copies against the pinned
+// CA bundle. The disconnect matters: the arena is sized for one serial TLS
+// connection, so verifying while the probe connection is still open would
+// starve the verify of arena space and produce bogus failures.
+static void tlsProbePeer(const char* host, const char* caBundle) {
+  DiagClientSecure probe;
+  probe.setInsecure();
+  if (!probe.connect(host, 443)) {
+    Serial.printf("[tls] probe %s connect failed\n", host);
+    return;
+  }
+  // Copy each served cert out of the ssl context (freed on stop()).
+  mbedtls_x509_crt chain;
+  mbedtls_x509_crt_init(&chain);
+  int i = 0;
+  for (const mbedtls_x509_crt* c = mbedtls_ssl_get_peer_cert(probe.ctx());
+       c && i < 4; c = c->next, i++) {
+    char subj[96], iss[96];
+    mbedtls_x509_dn_gets(subj, sizeof subj, &c->subject);
+    mbedtls_x509_dn_gets(iss, sizeof iss, &c->issuer);
+    Serial.printf("[tls] probe cert%d subj=%s iss=%s valid %04d-%02d-%02d..%04d-%02d-%02d\n",
+                  i, subj, iss,
+                  c->valid_from.year, c->valid_from.mon, c->valid_from.day,
+                  c->valid_to.year, c->valid_to.mon, c->valid_to.day);
+    mbedtls_x509_crt_parse_der(&chain, c->raw.p, c->raw.len);
+  }
+  probe.stop();   // frees the connection's arena footprint before verify
+  if (s_tlsHeap) {
+    Serial.printf("[tls] probe post-close heapcheck=%d free=%u\n",
+                  (int)multi_heap_check(s_tlsHeap, false),
+                  (unsigned)multi_heap_free_size(s_tlsHeap));
+  }
+  if (!chain.version || !caBundle) { mbedtls_x509_crt_free(&chain); return; }
+
+  mbedtls_x509_crt ca;
+  mbedtls_x509_crt_init(&ca);
+  int pr = mbedtls_x509_crt_parse(&ca, (const unsigned char*)caBundle, strlen(caBundle) + 1);
+  uint32_t flags = 0;
+  int vr = mbedtls_x509_crt_verify(&chain, &ca, nullptr, host, &flags, tlsVrfyCb, nullptr);
+  char vb[192];
+  mbedtls_x509_crt_verify_info(vb, sizeof vb, "", flags);
+  Serial.printf("[tls] probe verify ret=%d flags=0x%lx bundle_skipped=%d:%s\n",
+                vr, (unsigned long)flags, pr, vb);
+
+  // Bisect: verify the RSA-4096 link (Root YR cross-sign vs X1) in isolation
+  // to tell a crypto-path failure apart from chain-building quirks.
+  mbedtls_x509_crt* x1 = &ca;
+  while (x1) {
+    char s[96];
+    mbedtls_x509_dn_gets(s, sizeof s, &x1->subject);
+    if (strstr(s, "ISRG Root X1")) break;
+    x1 = x1->next;
+  }
+  mbedtls_x509_crt* top = &chain;
+  while (top->next) top = top->next;            // last served cert (Root YR by X1)
+  if (x1 && top != &chain) {
+    mbedtls_x509_crt* savedNext = x1->next;
+    x1->next = nullptr;                          // isolate X1 as the only trust anchor
+    uint32_t f2 = 0;
+    unsigned a0 = s_tlsArenaAllocs, m0 = s_tlsArenaMisses;
+    int vr2 = mbedtls_x509_crt_verify(top, x1, nullptr, nullptr, &f2, tlsVrfyCb, nullptr);
+    Serial.printf("[tls] probe link-verify ret=%d flags=0x%lx arena_allocs=%u misses=%u\n",
+                  vr2, (unsigned long)f2, s_tlsArenaAllocs - a0, s_tlsArenaMisses - m0);
+    x1->next = savedNext;
+  }
+  mbedtls_x509_crt_free(&ca);
+  mbedtls_x509_crt_free(&chain);
+}
+
 // Ensure g_osToken holds a valid bearer token (fetch when needed). false = no
 // client configured (go anonymous) or rejected creds (callers flag AUTH_BAD).
 bool openskyEnsureToken() {
@@ -1223,7 +1295,7 @@ bool openskyEnsureToken() {
   // Verified TLS, no insecure fallback: a handshake failure is a hard error,
   // not a downgrade to anonymous. 400/401 = bad creds (AUTH_BAD); transport/
   // 429/5xx = transient (g_osHandshakeFailed keeps the last auth state).
-  NetworkClientSecure sec;
+  DiagClientSecure sec;
   HTTPClient http;
   http.setTimeout(5000);
   String body = "grant_type=client_credentials&client_id=" + urlEncode(g_osClientId) +
@@ -1231,7 +1303,11 @@ bool openskyEnsureToken() {
   const char* tokenHdrs[] = { "Content-Type", "application/x-www-form-urlencoded", nullptr };
   int code = httpsRequestRetry(http, sec, kOsTokenUrl, HTTPS_METHOD_POST, body, tokenHdrs, false);
   if (isDevBuild()) Serial.printf("[net] OpenSky token response code=%d\n", code);
-  if (code < 0) { g_osHandshakeFailed = true; return false; }  // TLS/transport failure on all attempts
+  if (code < 0) {
+    g_osHandshakeFailed = true;
+    if (isDevBuild()) tlsProbePeer("auth.opensky-network.org", kIsrgRootCAs);
+    return false;   // TLS/transport failure on all attempts
+  }
   if (code == HTTP_CODE_UNAUTHORIZED || code == HTTP_CODE_BAD_REQUEST) return false;  // genuine bad creds
   if (code != HTTP_CODE_OK) { g_osHandshakeFailed = true; return false; }  // transient server error (429/5xx)
   BoundedAllocator tokenAlloc(8192);
@@ -1330,6 +1406,32 @@ void fetchFlights() {
     Serial.printf("[net] OpenSky auth client=%s token=%s handshake=%d\n",
                   g_osClientId.length() ? "set" : "blank",
                   authed ? "set" : "none", (int)g_osHandshakeFailed);
+  }
+  // Anonymous polling is only for devices with no configured credentials.
+  // Falling back to anonymous after a token-mint failure burns the shared
+  // 400/day per-source-IP bucket - its 429 latches "No Flight Credits" for
+  // hours while the authenticated bucket is untouched.
+  if (!authed && g_osClientId.length() > 0) {
+    g_authChecked = true;
+    if (g_osHandshakeFailed) {
+      g_radarDataFailed = true;
+      snprintf(lastErr, sizeof lastErr, "token tls fail");
+    } else {
+      // Mint rejected (400/401): genuinely bad creds. Count it toward the
+      // same streak/backoff as a rejected states request so polling eases off.
+      if (g_auth401Streak < 1000) g_auth401Streak++;
+      g_authState = AUTH_BAD;
+      snprintf(lastErr, sizeof lastErr, "401");
+      if (g_auth401Streak >= AUTH_401_BACKOFF_AFTER) {
+        g_nextRadarMs = millis() + CREDIT_RECOVERY_MS;
+        if (isDevBuild())
+          Serial.printf("[net] 401 streak=%d, backing off radar polling to %lus\n",
+                        g_auth401Streak, CREDIT_RECOVERY_MS / 1000UL);
+      }
+    }
+    http.end();
+    dirty = true;
+    return;
   }
   String authHdr;
   if (authed) authHdr = "Bearer " + g_osToken;
@@ -3198,19 +3300,18 @@ void handleTouch() {
 void setup() {
   Serial.begin(115200);
   // Install the TLS arena before anything can use mbedTLS (hook is
-  // process-global). multi_heap is lockless by default; a recursive mutex
-  // keeps it safe if TLS is ever driven from two tasks.
+  // process-global). multi_heap is lockless by default; a spinlock keeps it
+  // safe if TLS is ever driven from two tasks.
   {
     s_tlsArena = (uint8_t*)heap_caps_malloc(TLS_ARENA_BYTES,
                                            MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT);
     if (s_tlsArena) {
-      static SemaphoreHandle_t tlsHeapLock = xSemaphoreCreateRecursiveMutex();
       s_tlsHeap = multi_heap_register(s_tlsArena, TLS_ARENA_BYTES);
-      multi_heap_set_lock(s_tlsHeap, tlsHeapLock);
+      multi_heap_set_lock(s_tlsHeap, &s_tlsMux);
       mbedtls_platform_set_calloc_free(tlsArenaCalloc, tlsArenaFree);
     }
     if (isDevBuild()) {
-      void* probe = tlsArenaCalloc(1, 1024);
+      void* probe = tlsArenaCalloc(1, TLS_ARENA_MIN);   // >= threshold -> must land in arena
       bool inArena = probe && s_tlsArena &&
                      (uint8_t*)probe >= s_tlsArena &&
                      (uint8_t*)probe < s_tlsArena + TLS_ARENA_BYTES;
@@ -3539,8 +3640,16 @@ void otaTaskEntry(void*) {
     // Wait for in-flight net fetches: two tasks doing HTTP/lwIP at once can
     // trip a FreeRTOS xTaskPriorityDisinherit assert.
     while (netBusy) vTaskDelay(20);
+    // No TLS can be running here; park the arena's 56KB back in the main heap
+    // so WiFi RX pbuf allocation can't starve and stall the download.
+    tlsArenaSuspend();
+    if (isDevBuild()) {
+      Serial.printf("[ota] arena suspended intfree=%u intmax=%u\n",
+                    (unsigned)heap_caps_get_free_size(MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT),
+                    (unsigned)heap_caps_get_largest_free_block(MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT));
+    }
     performOTA(g_otaUrl, g_otaVersion, g_otaSha256);
-    // Only reached on failure (success reboots via ESP.restart()):
+    tlsArenaResume();   // only reached on failure (success reboots)
     g_otaRunning = false;
     g_screen = SCR_ABOUT;
     g_updateState = 4;   // Update Check Failed

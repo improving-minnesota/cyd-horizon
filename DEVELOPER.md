@@ -1078,6 +1078,15 @@ flag — a served response contradicts it, and a truly empty bucket re-latches
 via `429` on the next poll. The Route Lookup and Flight Tracking buckets don't
 affect the poll cadence.
 
+Anonymous polling is used **only** when no OpenSky credentials are configured:
+the anonymous bucket is 400/day keyed by source IP, so every device on a LAN
+shares it — a token-mint failure that silently fell back to anonymous used to
+burn that bucket and latch "No Flight Credits" for hours while the
+authenticated bucket was untouched. When credentials are configured but the
+token mint fails transiently (TLS/5xx/429), the states request is skipped for
+that cycle and the poll retries normally; a mint rejected with 400/401 counts
+toward the `AUTH_401_BACKOFF_AFTER` streak like a rejected request.
+
 `fetchRoute()` and `fetchTrack()` (both in `flight_details.ino`) are only called
 for the closest overhead plane (`planes[0]` when `distMi <= g_radiusMi`), and
 each is fetched once per overhead identity. The results (`g_routeOrigin` /
