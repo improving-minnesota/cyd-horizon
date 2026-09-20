@@ -1065,32 +1065,7 @@ static void tlsArenaFree(void* p) {
     heap_caps_free(p);
 }
 
-// OTA needs the heap back: netTask is paused while g_otaRunning and the OTA
-// task waits on netBusy, so no TLS can be in flight - but WiFi RX pbufs are
-// allocated from internal heap, and 56KB parked in the arena starves them
-// (RX drops -> TCP stalls -> the 20s HTTP timeout kills the download).
-// Suspend hands the block back for the download; resume re-acquires it if the
-// OTA fails (success reboots, which re-inits the arena anyway).
-static void tlsArenaSuspend() {
-  if (!s_tlsHeap) return;
-  mbedtls_platform_set_calloc_free(calloc, free);   // restore default allocator
-  // No multi_heap_unregister in this IDF rev; the heap control block lives in
-  // the block itself, so dropping the handle and freeing the block is enough
-  // (no allocations can be outstanding - netTask is paused and netBusy drained).
-  s_tlsHeap = nullptr;
-  heap_caps_free(s_tlsArena);
-  s_tlsArena = nullptr;
-}
 
-static void tlsArenaResume() {
-  if (s_tlsHeap) return;
-  s_tlsArena = (uint8_t*)heap_caps_malloc(TLS_ARENA_BYTES,
-                                          MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT);
-  if (!s_tlsArena) return;
-  s_tlsHeap = multi_heap_register(s_tlsArena, TLS_ARENA_BYTES);
-  multi_heap_set_lock(s_tlsHeap, &s_tlsMux);
-  mbedtls_platform_set_calloc_free(tlsArenaCalloc, tlsArenaFree);
-}
 
 // How many connection attempts (and ms between them) a retrying HTTPS request
 // makes before giving up on a transport-layer failure. Mirrors the OTA retry.
@@ -3640,16 +3615,8 @@ void otaTaskEntry(void*) {
     // Wait for in-flight net fetches: two tasks doing HTTP/lwIP at once can
     // trip a FreeRTOS xTaskPriorityDisinherit assert.
     while (netBusy) vTaskDelay(20);
-    // No TLS can be running here; park the arena's 56KB back in the main heap
-    // so WiFi RX pbuf allocation can't starve and stall the download.
-    tlsArenaSuspend();
-    if (isDevBuild()) {
-      Serial.printf("[ota] arena suspended intfree=%u intmax=%u\n",
-                    (unsigned)heap_caps_get_free_size(MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT),
-                    (unsigned)heap_caps_get_largest_free_block(MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT));
-    }
     performOTA(g_otaUrl, g_otaVersion, g_otaSha256);
-    tlsArenaResume();   // only reached on failure (success reboots)
+    // Only reached on failure (success reboots via ESP.restart()):
     g_otaRunning = false;
     g_screen = SCR_ABOUT;
     g_updateState = 4;   // Update Check Failed

@@ -514,26 +514,36 @@ its actual host. Firmware integrity is independently pinned:
 `digest` from the GitHub API before flashing (an empty digest skips the check).
 A mismatch aborts the update without touching the running slot.
 
-**TLS heap arena.** An mbedTLS handshake peaks at ~40–50 KB of heap (two ~16 KB
-record buffers, certificate parsing, bignum) — the app's largest contiguous
-allocation and its biggest alloc/free churner. On a PSRAM-less board, long
-uptimes fragment the main heap until the 16 KB record buffer can't find a
-contiguous block; every connect then fails `HTTPClient` `-1` and only a reboot
-recovers (the ESP-IDF heap has no compaction). `setup()` therefore installs a
-private arena: `mbedtls_platform_set_calloc_free()` routes every mbedTLS
-allocation into a 56 KB block managed by `multi_heap` (`s_tlsArena` in
-`cyd-horizon.ino`). It's `heap_caps_malloc`'d once at boot — a static array
-would overflow the ESP32's `dram0_0` .bss segment, and boot-time heap is
-clean so the block is guaranteed contiguous. The stock core ships
-`MBEDTLS_PLATFORM_MEMORY` enabled, so
-the runtime hook needs no rebuilt libraries. Handshakes are immune to
-main-heap fragmentation and TLS churn never touches the main heap. If the
-arena is ever exhausted, the allocator falls back to `heap_caps_calloc` (main
-heap); frees are routed back by pointer-range check. TLS sessions are
-serialized by design (one fetch at a time; the OTA task waits on `netBusy`),
-so the arena only ever serves one connection; a recursive mutex guards the
-multi_heap anyway. Dev builds log `arenafree=` around each TLS attempt so the
-arena's headroom is observable.
+**TLS heap arena.** An mbedTLS handshake peaks at ~60–70 KB total (two ~16.7 KB
+record buffers — `MBEDTLS_SSL_MAX_CONTENT_LEN=16384` is compiled into the
+shipped libs — plus certificate parsing and RSA workspace) — the app's largest
+contiguous need and its biggest alloc/free churner. On a PSRAM-less board, long
+uptimes fragment the main heap until a big record-buffer alloc can't find a
+contiguous block; connects then fail and only a reboot recovers (the ESP-IDF
+heap has no compaction). `setup()` therefore installs a private arena:
+`mbedtls_platform_set_calloc_free()` routes mbedTLS allocations **≥4 KB** into
+a 40 KB block managed by `multi_heap` (`s_tlsArena` in `cyd-horizon.ino`),
+while smaller allocations stay on the main heap. Each side falls back to the
+other on failure, so a miss never fails outright.
+
+Size-routing matters: the *whole* handshake does not fit in a 40–56 KB arena
+(the CA-bundle parse alone is ~8–16 KB of small allocs), and oversizing the
+arena starves WiFi RX pbufs — which is what stalled OTA downloads mid-stream.
+The arena only needs to guarantee the big, fragmentation-sensitive buffers;
+small allocs tolerate a fragmented heap. It's `heap_caps_malloc`'d once at boot
+(a static array overflows `dram0_0`); the stock core ships
+`MBEDTLS_PLATFORM_MEMORY` enabled so the runtime hook needs no rebuilt
+libraries. TLS is serialized by design (one fetch at a time; the OTA task waits
+on `netBusy`), so the arena only ever serves one connection; a `portMUX_TYPE`
+spinlock guards the multi_heap (a FreeRTOS semaphore is NOT interchangeable —
+it deadlocks). Dev builds log `arenafree=` around each TLS attempt plus
+`arena-miss`/`both-fail` diagnostics.
+
+> TODO: update the certificate-bundle documentation once the trimmed
+> `kIsrgRootCAs` set (X1, X2, Root YR, Root YE — see "TLS" above) is final.
+> Document which anchors cover which chain shapes (classic R/E intermediates
+> vs Gen-Y cross-signed vs bare roots) and the Let's Encrypt certificate
+> sources used to refresh the PEMs.
 
 ### HTTP body streaming and JSON parsing
 
