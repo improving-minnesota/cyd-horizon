@@ -539,11 +539,40 @@ spinlock guards the multi_heap (a FreeRTOS semaphore is NOT interchangeable —
 it deadlocks). Dev builds log `arenafree=` around each TLS attempt plus
 `arena-miss`/`both-fail` diagnostics.
 
-> TODO: update the certificate-bundle documentation once the trimmed
-> `kIsrgRootCAs` set (X1, X2, Root YR, Root YE — see "TLS" above) is final.
-> Document which anchors cover which chain shapes (classic R/E intermediates
-> vs Gen-Y cross-signed vs bare roots) and the Let's Encrypt certificate
-> sources used to refresh the PEMs.
+**ISRG bundle contents** (`kIsrgRootCAs`, four anchors):
+
+| Cert | Role |
+|---|---|
+| ISRG Root X1 | Anchors classic chains (leaf → R10–R14/E5–E9 → X1) *and* Gen-Y chains that cross-sign Root YR/YE under X1 |
+| ISRG Root X2 | ECDSA root — anchors chains that terminate at X2 |
+| Root YR (self-signed) | Anchors a bare Gen-Y RSA chain served *without* the X1 cross-sign |
+| Root YE (self-signed) | Same for Gen-Y ECDSA |
+
+Deliberately **omitted** — servers send these on the wire, so bundling them
+only costs handshake-parse heap (~2 KB per cert) with no coverage gain: the
+X1/YR and X1/YE *cross-signed* root variants, and intermediates (YR1/YR2,
+YE1/YE2, R10–R14, E5–E9). An intermediate must never be bundled as a trust
+anchor for a host whose chain already terminates at a real root — it just
+adds parse cost. (One exception exists in `kGlobalSignEccRootCAs`: the WE1
+intermediate is bundled because that server sometimes omits it.)
+
+**Refreshing the bundle.** Get canonical PEMs from Let's Encrypt's
+[certificate pages](https://letsencrypt.org/certificates/) (chains section
+lists self-signed roots and cross-signs — take the *self-signed* roots only).
+To check what a live host actually serves:
+
+```sh
+openssl s_client -connect auth.opensky-network.org:443 -servername auth.opensky-network.org -showcerts </dev/null
+```
+
+Extract each `BEGIN/END CERTIFICATE` block and inspect with
+`openssl x509 -noout -subject -issuer -dates`. If the chain ends at a root not
+in `kIsrgRootCAs`, add that self-signed root — not the cross-signed variant,
+not the intermediate. On-device verification (dev builds): the probe logs the
+served chain and runs `mbedtls_x509_crt_verify()` against the bundle; `ret=0
+flags=0x0` is success, `flags=0x8` (`NOT_TRUSTED`) means the anchor is missing
+or the heap is too starved to finish parsing — check `arena-miss`/`both-fail`
+counters before assuming the bundle is wrong.
 
 ### HTTP body streaming and JSON parsing
 
