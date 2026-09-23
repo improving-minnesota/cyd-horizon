@@ -559,7 +559,7 @@ enum Screen { SCR_DASH, SCR_SETTINGS, SCR_GENERAL, SCR_ABOUT, SCR_HELP, SCR_WIFI
 Screen g_screen = SCR_DASH;
 Screen g_creditsReturn = SCR_DASH;   // screen to return to from the OpenSky Credits page
 int g_helpScroll = 0;   // Help page vertical scroll offset (px)
-int g_resetConfirm = 0;  // Reset screen sub-state: 0=choose, 1=Factory, 2=Settings, 3=Graph Data, 4=Restart
+int g_resetConfirm = 0;  // Reset screen sub-state: 0=choose, 1=Factory, 2=Settings, 3=Graph Data, 4=Restart, 5=Network
 
 extern int g_wifiSub;   // defined in wifi_config.ino
 // Alarm state lives in alarms.ino (alphabetically first of the secondary
@@ -3146,22 +3146,36 @@ void handleTouch() {
   if (g_screen == SCR_RESET) {
     if (g_resetConfirm == 0) {
       // Step 1: choose what to reset. Buttons stacked top-right: Factory Reset,
-      // Graph Data, Settings; Restart bottom-left, Cancel bottom-right.
+      // Graph Data, Settings, Network; Restart bottom-left, Cancel bottom-right.
       if (inRect(x, y, RX(172), 36, RX(312), 66)) { g_resetConfirm = 1; dirty = true; }          // Factory Reset
       else if (inRect(x, y, RX(172), 80, RX(312), 110)) { g_resetConfirm = 3; dirty = true; }    // Graph Data
       else if (inRect(x, y, RX(172), 124, RX(312), 154)) { g_resetConfirm = 2; dirty = true; }   // Settings
+      else if (inRect(x, y, RX(172), 168, RX(312), 198)) { g_resetConfirm = 5; dirty = true; }   // Network
       else if (inRect(x, y, 10, 210, 150, 236)) { g_resetConfirm = 4; dirty = true; }    // Restart
       else if (inRect(x, y, RX(172), 210, RX(312), 236)) { g_resetConfirm = 0; g_screen = SCR_SETTINGS; dirty = true; }  // Cancel
       return;
     }
     // Step 2: confirmation prompt.
     if (inRect(x, y, 30, 180, 140, 214)) {  // Yes -> wipe + reboot
-      // Reset scopes: (3) graph files only; (2) NVS minus touch calibration
-      // (hardware-specific, same namespace); (1) also logos + calibration.
+      // Reset scopes: (3) graph files only; (5) network keys only - WiFi
+      // credentials + IP config, all other settings survive; (2) NVS minus
+      // touch calibration (hardware-specific, same namespace); (1) also
+      // logos + calibration.
       if (g_resetConfirm == 4) {  // Restart only, no data wipe
         ESP.restart();
       }
-      if (g_resetConfirm != 3) {
+      if (g_resetConfirm == 5) {
+        prefs.begin("flight", false);
+        prefs.remove("ssid");   prefs.remove("pass");
+        prefs.remove("ipdhcp"); prefs.remove("ipaddr"); prefs.remove("ipmask");
+        prefs.remove("ipgw");   prefs.remove("ipdns");  prefs.remove("hostname");
+        prefs.remove("otahost");
+        prefs.end();
+        // The WiFi driver persists its own copy of the STA credentials in NVS
+        // (persistent() defaults on) - erase it too, or the radio could
+        // auto-connect to the just-forgotten network on the next boot.
+        WiFi.disconnect(false, true);
+      } else if (g_resetConfirm != 3) {
         prefs.begin("flight", false);
         prefs.clear();
         if (g_resetConfirm == 2) {
@@ -3180,6 +3194,9 @@ void handleTouch() {
         tft.drawCentreString("Performing Factory Reset...", CX, 108, 2);
       } else if (g_resetConfirm == 2) {               // Settings
         tft.drawCentreString("Resetting Stored", CX, 100, 2);
+        tft.drawCentreString("Settings...", CX, 118, 2);
+      } else if (g_resetConfirm == 5) {               // Network
+        tft.drawCentreString("Resetting Network", CX, 100, 2);
         tft.drawCentreString("Settings...", CX, 118, 2);
       } else {                                        // Graph Data
         tft.drawCentreString("Resetting Graph Data...", CX, 108, 2);

@@ -348,6 +348,8 @@ static const char* const kHelpLines[] = {
   "Reset: Settings clears",
   "   settings & credentials",
   "   (keeps touch calibration).",
+  "   Network clears WiFi, IP",
+  "   & hostname only.",
   "   Graph Data clears pool &",
   "   weather temp history.",
   "   Factory Reset clears ALL",
@@ -1023,7 +1025,7 @@ void handleFtrackerTouch(uint16_t x, uint16_t y) {
   }
 }
 
-// Reset screen. Two steps: choose what to reset (Factory / Settings / Graph Data / Restart / Cancel),
+// Reset screen. Two steps: choose what to reset (Factory / Settings / Graph Data / Network / Restart / Cancel),
 // then a confirmation prompt before anything is wiped and the device reboots.
 void drawReset() {
   tft.fillScreen(TFT_BLACK);
@@ -1058,6 +1060,12 @@ void drawReset() {
       tft.setCursor(10, ty); tft.print("weather temperature history"); ty += 12;
       tft.setCursor(10, ty); tft.print("will be deleted."); ty += 12;
       tft.setCursor(10, ty); tft.print("The device will reboot."); ty += 12;
+    } else if (g_resetConfirm == 5) {   // Network: WiFi creds + IP config only
+      tft.setCursor(10, ty); tft.print("Network: WiFi credentials,"); ty += 12;
+      tft.setCursor(10, ty); tft.print("IP settings and hostname"); ty += 12;
+      tft.setCursor(10, ty); tft.print("will be cleared; all other"); ty += 12;
+      tft.setCursor(10, ty); tft.print("settings are kept."); ty += 12;
+      tft.setCursor(10, ty); tft.print("The device will reboot."); ty += 12;
     } else {                            // Restart: no data change
       tft.setCursor(10, ty); tft.print("Restart the device?"); ty += 12;
       tft.setCursor(10, ty); tft.print("No settings will be cleared."); ty += 12;
@@ -1089,18 +1097,20 @@ void drawReset() {
   int ly = 64;
   tft.setCursor(10, ly); tft.print("Factory Reset: all"); ly += 10;
   tft.setCursor(10, ly); tft.print("  settings, files,"); ly += 10;
-  tft.setCursor(10, ly); tft.print("  logos & touch cal."); ly += 14;
+  tft.setCursor(10, ly); tft.print("  logos & touch cal."); ly += 12;
   tft.setCursor(10, ly); tft.print("Graph Data: pool &"); ly += 10;
-  tft.setCursor(10, ly); tft.print("  weather history."); ly += 14;
+  tft.setCursor(10, ly); tft.print("  weather history."); ly += 12;
   tft.setCursor(10, ly); tft.print("Settings: settings &"); ly += 10;
-  tft.setCursor(10, ly); tft.print("  credentials."); ly += 14;
+  tft.setCursor(10, ly); tft.print("  credentials."); ly += 12;
+  tft.setCursor(10, ly); tft.print("Network: WiFi creds,"); ly += 10;
+  tft.setCursor(10, ly); tft.print("  IP & hostname."); ly += 12;
   tft.setCursor(10, ly); tft.print("Cancel: back without"); ly += 10;
-  tft.setCursor(10, ly); tft.print("  changing anything."); ly += 14;
+  tft.setCursor(10, ly); tft.print("  changing anything."); ly += 12;
   tft.setCursor(10, ly); tft.print("Restart: reboots the"); ly += 10;
-  tft.setCursor(10, ly); tft.print("  device cleanly."); ly += 14;
+  tft.setCursor(10, ly); tft.print("  device cleanly."); ly += 12;
 
-  // Right column: Factory Reset / Graph Data / Settings stacked top-right and
-  // spaced apart.  Bottom row has Restart (left) and Cancel (right).
+  // Right column: Factory Reset / Graph Data / Settings / Network stacked
+  // top-right and spaced apart.  Bottom row has Restart (left) and Cancel (right).
   tft.setTextFont(2);
   tft.fillRoundRect(RX(172), 36, 140, 30, 6, dangerCol());
   tft.setTextColor(btnFg(dangerCol()), dangerCol());
@@ -1113,6 +1123,10 @@ void drawReset() {
   tft.fillRoundRect(RX(172), 124, 140, 30, 6, TFT_ORANGE);
   tft.setTextColor(TFT_WHITE, TFT_ORANGE);
   tft.drawCentreString("Settings", RX(242), 131, 2);
+
+  tft.fillRoundRect(RX(172), 168, 140, 30, 6, TFT_PURPLE);
+  tft.setTextColor(TFT_WHITE, TFT_PURPLE);
+  tft.drawCentreString("Network", RX(242), 175, 2);
 
   tft.fillRoundRect(10, 210, 140, 26, 6, TFT_DARKGREEN);
   tft.setTextColor(TFT_WHITE, TFT_DARKGREEN);

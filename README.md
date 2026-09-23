@@ -250,8 +250,9 @@ Defaults for a freshly reset device are shown with each setting.
   calibration, so the next boot asks you to recalibrate — ⚠️ if the device
   came pre-loaded with airline logos, restoring logos requires regenerating
   and reloading them from a development computer; **Settings** clears settings and
-  credentials; **Graph Data**
-  clears pool and weather temperature history. All three reboot the device.
+  credentials; **Network** clears only WiFi credentials and IP settings
+  (static IP config, hostname); **Graph Data**
+  clears pool and weather temperature history. All four reboot the device.
   **Restart** reboots without clearing anything; **Cancel** changes nothing.
 - **Sleep Mode** — enable it, set the start/end time, and the wake duration.
   Defaults: **on**, sleeps 10:00 PM – 8:00 AM, **5 min** wake.
