@@ -1,5 +1,12 @@
 # Changelog
 
+## [3.9.0](https://github.com/improving-minnesota/cyd-horizon/compare/v3.8.3...v3.9.0) (2026-09-23)
+
+
+### Features
+
+* add Network reset option to Settings &gt; Reset ([#169](https://github.com/improving-minnesota/cyd-horizon/issues/169)) ([4fa96ea](https://github.com/improving-minnesota/cyd-horizon/commit/4fa96ea6a1a0f743f196af9f6d45097dbf72b356))
+
 ## [3.8.3](https://github.com/improving-minnesota/cyd-horizon/releases/tag/v3.8.3) (2026-09-20)
 
 
