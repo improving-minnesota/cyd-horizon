@@ -42,6 +42,8 @@ Every option asks you to confirm and says exactly what it clears:
 - **Restart** — reboots only; clears nothing.
 - **Graph Data** — clears pool and weather temperature history.
 - **Settings** — clears settings and credentials (keeps touch calibration).
+- **Network** — clears WiFi credentials and IP settings (static IP, hostname);
+  everything else is kept.
 - **Factory Reset** — clears *everything*: settings, credentials, files,
   history, and touch calibration. The next boot recalibrates touch and asks
   for WiFi again.
