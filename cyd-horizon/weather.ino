@@ -150,7 +150,7 @@ void fetchWeather() {
   NetworkClientSecure sec;
   HTTPClient http;
   http.setTimeout(5000);
-  int code = httpsRequestRetry(http, sec, url, HTTPS_METHOD_GET, "", nullptr, false);
+  int code = httpsRequestRetry(http, sec, url, HTTPS_METHOD_GET, "", nullptr);
   if (code == HTTP_CODE_TOO_MANY_REQUESTS) {
     noteWxRateLimit(http);
     g_weatherDataFailed = true;

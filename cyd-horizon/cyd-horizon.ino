@@ -745,229 +745,14 @@ bool tryConnect(const char* ssid, const char* pass) {
 const char* kOsTokenUrl = "https://auth.opensky-network.org/auth/realms/opensky-network/protocol/openid-connect/token";
 const int   kOsTokenLifetimeMs = 30 * 60 * 1000;   // OpenSky tokens expire after ~30 min
 
-// Per-host trust stores: the smallest bundle covering each cert chain (fewer
-// roots parsed per handshake). No fallback bundle - unmapped hosts fail TLS.
+// Attach the trust store and start a verified request. Every host is verified
+// against the built-in Mozilla bundle (refreshed with the core); no path is
+// ever downgraded to an unverified connection.
+extern const uint8_t kMozBundleStart[] asm("_binary_x509_crt_bundle_start");
+extern const uint8_t kMozBundleEnd[]   asm("_binary_x509_crt_bundle_end");
 
-// Govee: Amazon Root CA 1
-static const char* const kAmazonRootCAs =
-  // [9] Amazon Root CA 1
-  "-----BEGIN CERTIFICATE-----\n"
-  "MIIDQTCCAimgAwIBAgITBmyfz5m/jAo54vB4ikPmljZbyjANBgkqhkiG9w0BAQsF\n"
-  "ADA5MQswCQYDVQQGEwJVUzEPMA0GA1UEChMGQW1hem9uMRkwFwYDVQQDExBBbWF6\n"
-  "b24gUm9vdCBDQSAxMB4XDTE1MDUyNjAwMDAwMFoXDTM4MDExNzAwMDAwMFowOTEL\n"
-  "MAkGA1UEBhMCVVMxDzANBgNVBAoTBkFtYXpvbjEZMBcGA1UEAxMQQW1hem9uIFJv\n"
-  "b3QgQ0EgMTCCASIwDQYJKoZIhvcNAQEBBQADggEPADCCAQoCggEBALJ4gHHKeNXj\n"
-  "ca9HgFB0fW7Y14h29Jlo91ghYPl0hAEvrAIthtOgQ3pOsqTQNroBvo3bSMgHFzZM\n"
-  "9O6II8c+6zf1tRn4SWiw3te5djgdYZ6k/oI2peVKVuRF4fn9tBb6dNqcmzU5L/qw\n"
-  "IFAGbHrQgLKm+a/sRxmPUDgH3KKHOVj4utWp+UhnMJbulHheb4mjUcAwhmahRWa6\n"
-  "VOujw5H5SNz/0egwLX0tdHA114gk957EWW67c4cX8jJGKLhD+rcdqsq08p8kDi1L\n"
-  "93FcXmn/6pUCyziKrlA4b9v7LWIbxcceVOF34GfID5yHI9Y/QCB/IIDEgEw+OyQm\n"
-  "jgSubJrIqg0CAwEAAaNCMEAwDwYDVR0TAQH/BAUwAwEB/zAOBgNVHQ8BAf8EBAMC\n"
-  "AYYwHQYDVR0OBBYEFIQYzIU07LwMlJQuCFmcx7IQTgoIMA0GCSqGSIb3DQEBCwUA\n"
-  "A4IBAQCY8jdaQZChGsV2USggNiMOruYou6r4lK5IpDB/G/wkjUu0yKGX9rbxenDI\n"
-  "U5PMCCjjmCXPI6T53iHTfIUJrU6adTrCC2qJeHZERxhlbI1Bjjt/msv0tadQ1wUs\n"
-  "N+gDS63pYaACbvXy8MWy7Vu33PqUXHeeE6V/Uq2V8viTO96LXFvKWlJbYK8U90vv\n"
-  "o/ufQJVtMVT8QtPHRh8jrdkPSHCa2XV4cdFyQzR1bldZwgJcJmApzyMZFo6IQ6XU\n"
-  "5MsI+yMRQ+hDKXJioaldXgjUkK642M4UwtBV8ob2xJNDd2ZhwLnoQdeXeGADbkpy\n"
-  "rqXRfboQnoZsG4q5WTP468SQvvG5\n"
-  "-----END CERTIFICATE-----\n";
-
-
-// GitHub API: Sectigo / USERTrust ECC root
-static const char* const kSectigoUSERTrustEccRootCAs =
-  // [1] USERTrust ECC Certification Authority
-  "-----BEGIN CERTIFICATE-----\n"
-  "MIICjzCCAhWgAwIBAgIQXIuZxVqUxdJxVt7NiYDMJjAKBggqhkjOPQQDAzCBiDEL\n"
-  "MAkGA1UEBhMCVVMxEzARBgNVBAgTCk5ldyBKZXJzZXkxFDASBgNVBAcTC0plcnNl\n"
-  "eSBDaXR5MR4wHAYDVQQKExVUaGUgVVNFUlRSVVNUIE5ldHdvcmsxLjAsBgNVBAMT\n"
-  "JVVTRVJUcnVzdCBFQ0MgQ2VydGlmaWNhdGlvbiBBdXRob3JpdHkwHhcNMTAwMjAx\n"
-  "MDAwMDAwWhcNMzgwMTE4MjM1OTU5WjCBiDELMAkGA1UEBhMCVVMxEzARBgNVBAgT\n"
-  "Ck5ldyBKZXJzZXkxFDASBgNVBAcTC0plcnNleSBDaXR5MR4wHAYDVQQKExVUaGUg\n"
-  "VVNFUlRSVVNUIE5ldHdvcmsxLjAsBgNVBAMTJVVTRVJUcnVzdCBFQ0MgQ2VydGlm\n"
-  "aWNhdGlvbiBBdXRob3JpdHkwdjAQBgcqhkjOPQIBBgUrgQQAIgNiAAQarFRaqflo\n"
-  "I+d61SRvU8Za2EurxtW20eZzca7dnNYMYf3boIkDuAUU7FfO7l0/4iGzzvfUinng\n"
-  "o4N+LZfQYcTxmdwlkWOrfzCjtHDix6EznPO/LlxTsV+zfTJ/ijTjeXmjQjBAMB0G\n"
-  "A1UdDgQWBBQ64QmG1M8ZwpZ2dEl23OA1xmNjmjAOBgNVHQ8BAf8EBAMCAQYwDwYD\n"
-  "VR0TAQH/BAUwAwEB/zAKBggqhkjOPQQDAwNoADBlAjA2Z6EWCNzklwBBHU6+4WMB\n"
-  "zzuqQhFkoJ2UOQIReVx7Hfpkue4WQrO/isIJxOzksU0CMQDpKmFHjFJKS04YcPbW\n"
-  "RNZu9YO6bVi9JNlWSOrvxKJGgYhqOkbRqZtNyWHa0V1Xahg=\n"
-  "-----END CERTIFICATE-----\n";
-// OpenSky, open-meteo, Nominatim: Let's Encrypt / ISRG hierarchy
-static const char* const kIsrgRootCAs =
-  // [2] ISRG Root X1
-  "-----BEGIN CERTIFICATE-----\n"
-  "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\n"
-  "-----END CERTIFICATE-----\n"
-  //
-  // [3] Root YR
-  "-----BEGIN CERTIFICATE-----\n"
-  "MIIFKTCCAxGgAwIBAgIRAOxGNJNgz0sP+KmC2Tqpyj0wDQYJKoZIhvcNAQELBQAw\n"
-  "LjELMAkGA1UEBhMCVVMxDTALBgNVBAoTBElTUkcxEDAOBgNVBAMTB1Jvb3QgWVIw\n"
-  "HhcNMjUwOTAzMDAwMDAwWhcNNDUwOTAyMjM1OTU5WjAuMQswCQYDVQQGEwJVUzEN\n"
-  "MAsGA1UEChMESVNSRzEQMA4GA1UEAxMHUm9vdCBZUjCCAiIwDQYJKoZIhvcNAQEB\n"
-  "BQADggIPADCCAgoCggIBANvGJnN78CTJdWL3+eGfsLN5TrNBJs+VH9hRXqRbwxu9\n"
-  "sGNiB0BD1fcOxbSUQCJIM1xE13Db+5Cw1w0s0EBYsvuIP/6joF0w8cuImbgR1OGg\n"
-  "YbSQ4OpzI+DG8SGuTlcE873OCS+kh3srlo6vl43M5OJg4Aeo1sfHp6kTJDoIiFBN\n"
-  "JAY+OKfX/FUvYKuhjT+no49lmqmupSBI5PkBQiqrEGtWU5uxU/cQWHGu8jSjFBzn\n"
-  "ZqvbNPLMXMLFxCb3WTfrJBXXjqvWG+v4bjzxjjeAtOlU7qarRDvNOyAuQYLln904\n"
-  "M+faKx8hnLCpJ15ZqaEgcNlY+9MMWcC5yvL2A2j3l9+2buggZX+dOE91zYmIdawT\n"
-  "vSZuVvlbRrAlLxIB6pwMBjneXCjYQ8+3BCCjssbSNpZU3hTcBDdhfAlEDlYr6pEa\n"
-  "tnMdmDT5BqnKC92bd0EhM1fbLHioLccLCuievT8ZkPhZrq7Mii7gNXAcUEAR8+lz\n"
-  "Yal+9zTg7C5DALyVOeG/CqfRAMn1KSHCR0NSA6P8tn/mGRlnCct5rtVCLnVySVpU\n"
-  "6H1qGg3DgTOuskf8eahTMiYbI5ezPJmO5ertalskQ1utp74+eDy92PI4ftHKTbq9\n"
-  "IWhH4YZKh3WnJEIt+oQvlYZbY8tpEroKrFB6PFGzrJIDRyts4HqvuH52RFj2zv/B\n"
-  "AgMBAAGjQjBAMA4GA1UdDwEB/wQEAwIBBjAPBgNVHRMBAf8EBTADAQH/MB0GA1Ud\n"
-  "DgQWBBTe51tg0CJtQCh9Pw0B/qS1UrRRlDANBgkqhkiG9w0BAQsFAAOCAgEAWHnf\n"
-  "713Bdkq7t5yN2dNIgQakUb94X9WuyhMEHHkgx4oDpSUlnG0w4g94MoqaEUE31ZjR\n"
-  "LU7L5LD1g9ujFHTQu8AD215AHMVQFbm6j8hQxdXHAzDajFNQnOlDJrLjzIx176oy\n"
-  "AjvUtejZx2NNmdb5fd0WGVGsCdoAJ3N8ozo7ajE8t6vfxStZb4BQ9WYJGHUDrv2N\n"
-  "i5tJF6CNiPnlzs3BUfECRbE4JSk+jvy8+VoGiFE8qsH/j78x2fjgQhAQFV7P7Zxy\n"
-  "dBTZ1wEkNpZNW2qnaK1SKBLa+xf6E06YRIq5uaI+HWH8SY1y5VbRgzq40EKg3yxP\n"
-  "06fz+uYAUIFJoLNfhwRCc3Q6pQVuMX3yAjHAes4gk4moGcLQ5p7HAh39yeylZc1J\n"
-  "41sx/jKwLIkPE6Rr1Nf4pxdsxf9SA4yOEiAkDgq04DVxn8hgYFdUtBCuiuVC2heA\n"
-  "EiqVEa+8QZjuw8Gj0EbHXcRd1nInvGqRS1o9Is7YBdQN57X1AYveGBNNqjICSb7c\n"
-  "awuw1EawTDrs13VUlJVEsbQ0/O/1aaV73mCdOQ8azqL2KTv1Ewu1xbquE2S+kdQU\n"
-  "To9TUwat3wUA6cwXh1EfpS/3fJ0aGah5hdpRyoCLDlsSn8tkrjMfFFX0viC+GxHc\n"
-  "sI1ANRYvqSFC2X1VRZfDg+wD6E21BccmifG4yWc=\n"
-  "-----END CERTIFICATE-----\n"
-  //
-  // [4] Root YE
-  "-----BEGIN CERTIFICATE-----\n"
-  "MIIB2TCCAWCgAwIBAgIRAKQCa6LvbHwg1AR+XmWmk4AwCgYIKoZIzj0EAwMwLjEL\n"
-  "MAkGA1UEBhMCVVMxDTALBgNVBAoTBElTUkcxEDAOBgNVBAMTB1Jvb3QgWUUwHhcN\n"
-  "MjUwOTAzMDAwMDAwWhcNNDUwOTAyMjM1OTU5WjAuMQswCQYDVQQGEwJVUzENMAsG\n"
-  "A1UEChMESVNSRzEQMA4GA1UEAxMHUm9vdCBZRTB2MBAGByqGSM49AgEGBSuBBAAi\n"
-  "A2IABDwS/6vhrcVqcbBo+wgdI3fwn9x7DNJJOY/lTOti0vkwuRN87RhEhTH17E7X\n"
-  "yFjWsPYhIPt/wzOqxTd2b+4ZJNy9ID04YywF9U5zasDVyGSNErVNtz8uSGh5izW8\n"
-  "7j77GaNCMEAwDgYDVR0PAQH/BAQDAgEGMA8GA1UdEwEB/wQFMAMBAf8wHQYDVR0O\n"
-  "BBYEFKPIJlqOoUzQNWP8myPIOq5W809WMAoGCCqGSM49BAMDA2cAMGQCMHhMr8N9\n"
-  "LdL1VQKs9BdV81r76eXRB6mtjuNjzk6/lBsPNToWLTDzGYgtQKO1jl63uAIwGV7m\n"
-  "onyF377c+MM1oqVNs17sgu7F9YKZwgLmVbeOMDbKAXHtKMDLbiGllCcs8f47\n"
-  "-----END CERTIFICATE-----\n"
-  // Cross-signed variants of Root YR/YE are intentionally omitted: LE servers
-  // send them on the wire, and anchoring at X1/X2 or the bare roots covers both.
-  //
-  // [7] ISRG Root X2
-  "-----BEGIN CERTIFICATE-----\n"
-  "MIICGzCCAaGgAwIBAgIQQdKd0XLq7qeAwSxs6S+HUjAKBggqhkjOPQQDAzBPMQsw\n"
-  "CQYDVQQGEwJVUzEpMCcGA1UEChMgSW50ZXJuZXQgU2VjdXJpdHkgUmVzZWFyY2gg\n"
-  "R3JvdXAxFTATBgNVBAMTDElTUkcgUm9vdCBYMjAeFw0yMDA5MDQwMDAwMDBaFw00\n"
-  "MDA5MTcxNjAwMDBaME8xCzAJBgNVBAYTAlVTMSkwJwYDVQQKEyBJbnRlcm5ldCBT\n"
-  "ZWN1cml0eSBSZXNlYXJjaCBHcm91cDEVMBMGA1UEAxMMSVNSRyBSb290IFgyMHYw\n"
-  "EAYHKoZIzj0CAQYFK4EEACIDYgAEzZvVn4CDCuwJSvMWSj5cz3es3mcFDR0HttwW\n"
-  "+1qLFNvicWDEukWVEYmO6gbf9yoWHKS5xcUy4APgHoIYOIvXRdgKam7mAHf7AlF9\n"
-  "ItgKbppbd9/w+kHsOdx1ymgHDB/qo0IwQDAOBgNVHQ8BAf8EBAMCAQYwDwYDVR0T\n"
-  "AQH/BAUwAwEB/zAdBgNVHQ4EFgQUfEKWrt5LSDv6kviejM9ti6lyN5UwCgYIKoZI\n"
-  "zj0EAwMDaAAwZQIwe3lORlCEwkSHRhtFcP9Ymd70/aTSVaYgLXTWNLxBo1BfASdW\n"
-  "tL4ndQavEi51mI38AjEAi/V3bNTIZargCyzuFJ0nN6T5U6VR5CmD1/iQMVtCnwr1\n"
-  "/q4AaOeMSQ+2b1tbFfLn\n"
-  "-----END CERTIFICATE-----\n";
-
-
-// Earliest bundled-root expiry (ISRG Root X1 = 2035-06; conservative). Past it
-// OTA may fall back to setInsecure() so a root rotation can't block updates.
-#define OTA_CA_EXPIRY 2051222400UL
-
-// Smallest trust store covering the host; unmapped hosts fail TLS (no fallback
-// bundle). OTA may still go insecure past OTA_CA_EXPIRY.
-// adsb.lol / vrs-standing-data: GlobalSign ECC Root CA - R4 + WE1 intermediate.
-static const char* const kGlobalSignEccRootCAs =
-  "-----BEGIN CERTIFICATE-----\n"
-  "MIIB4TCCAYegAwIBAgIRKjikHJYKBN5CsiilC+g0mAIwCgYIKoZIzj0EAwIwUDEk\n"
-  "MCIGA1UECxMbR2xvYmFsU2lnbiBFQ0MgUm9vdCBDQSAtIFI0MRMwEQYDVQQKEwpH\n"
-  "bG9iYWxTaWduMRMwEQYDVQQDEwpHbG9iYWxTaWduMB4XDTEyMTExMzAwMDAwMFoX\n"
-  "DTM4MDExOTAzMTQwN1owUDEkMCIGA1UECxMbR2xvYmFsU2lnbiBFQ0MgUm9vdCBD\n"
-  "QSAtIFI0MRMwEQYDVQQKEwpHbG9iYWxTaWduMRMwEQYDVQQDEwpHbG9iYWxTaWdu\n"
-  "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEuMZ5049sJQ6fLjkZHAOkrprlOQcJ\n"
-  "FspjsbmG+IpXwVfOQvpzofdlQv8ewQCybnMO/8ch5RikqtlxP6jUuc6MHaNCMEAw\n"
-  "DgYDVR0PAQH/BAQDAgEGMA8GA1UdEwEB/wQFMAMBAf8wHQYDVR0OBBYEFFSwe61F\n"
-  "uOJAf/sKbvu+M8k8o4TVMAoGCCqGSM49BAMCA0gAMEUCIQDckqGgE6bPA7DmxCGX\n"
-  "kPoUVy0D7O48027KqGx2vKLeuwIgJ6iFJzWbVsaj8kfSt24bAgAXqmemFZHe+pTs\n"
-  "ewv4n4Q=\n"
-  "-----END CERTIFICATE-----\n" \
-  "-----BEGIN CERTIFICATE-----\n"
-  "MIICjjCCAjOgAwIBAgIQf/NXaJvCTjAtkOGKQb0OHzAKBggqhkjOPQQDAjBQMSQw\n"
-  "IgYDVQQLExtHbG9iYWxTaWduIEVDQyBSb290IENBIC0gUjQxEzARBgNVBAoTCkds\n"
-  "b2JhbFNpZ24xEzARBgNVBAMTCkdsb2JhbFNpZ24wHhcNMjMxMjEzMDkwMDAwWhcN\n"
-  "MjkwMjIwMTQwMDAwWjA7MQswCQYDVQQGEwJVUzEeMBwGA1UEChMVR29vZ2xlIFRy\n"
-  "dXN0IFNlcnZpY2VzMQwwCgYDVQQDEwNXRTEwWTATBgcqhkjOPQIBBggqhkjOPQMB\n"
-  "BwNCAARvzTr+Z1dHTCEDhUDCR127WEcPQMFcF4XGGTfn1XzthkubgdnXGhOlCgP4\n"
-  "mMTG6J7/EFmPLCaY9eYmJbsPAvpWo4IBAjCB/zAOBgNVHQ8BAf8EBAMCAYYwHQYD\n"
-  "VR0lBBYwFAYIKwYBBQUHAwEGCCsGAQUFBwMCMBIGA1UdEwEB/wQIMAYBAf8CAQAw\n"
-  "HQYDVR0OBBYEFJB3kjVnxP+ozKnme9mAeXvMk/k4MB8GA1UdIwQYMBaAFFSwe61F\n"
-  "uOJAf/sKbvu+M8k8o4TVMDYGCCsGAQUFBwEBBCowKDAmBggrBgEFBQcwAoYaaHR0\n"
-  "cDovL2kucGtpLmdvb2cvZ3NyNC5jcnQwLQYDVR0fBCYwJDAioCCgHoYcaHR0cDov\n"
-  "L2MucGtpLmdvb2cvci9nc3I0LmNybDATBgNVHSAEDDAKMAgGBmeBDAECATAKBggq\n"
-  "hkjOPQQDAgNJADBGAiEAokJL0LgR6SOLR02WWxccAq3ndXp4EMRveXMUVUxMWSMC\n"
-  "IQDspFWa3fj7nLgouSdkcPy1SdOR2AGm9OQWs7veyXsBwA==\n"
-  "-----END CERTIFICATE-----\n";
-
-static bool hostSuffixMatches(const char* host, size_t len, const char* suffix) {
-  size_t slen = strlen(suffix);
-  if (len < slen) return false;
-  const char* p = host + len - slen;
-  for (size_t i = 0; i < slen; ++i) {
-    char a = p[i], b = suffix[i];
-    if (a >= 'A' && a <= 'Z') a += 32;
-    if (b >= 'A' && b <= 'Z') b += 32;
-    if (a != b) return false;
-  }
-  return true;
-}
-static const char* trustStoreForUrl(const char* url) {
-  const char* p = strstr(url, "://");
-  const char* host = p ? p + 3 : url;
-  const char* end = host;
-  while (*end && *end != '/' && *end != ':' && *end != '?') ++end;
-  size_t len = end - host;
-  if (hostSuffixMatches(host, len, "opensky-network.org"))      return kIsrgRootCAs;
-  if (hostSuffixMatches(host, len, "open-meteo.com"))           return kIsrgRootCAs;
-  if (hostSuffixMatches(host, len, "openstreetmap.org"))        return kIsrgRootCAs;
-  if (hostSuffixMatches(host, len, "govee.com"))                return kAmazonRootCAs;
-  // GitHub API is Sectigo/USERTrust-signed; GitHub release assets are
-  // served from *.githubusercontent.com and use Let's Encrypt / ISRG.
-  if (hostSuffixMatches(host, len, "github.com"))               return kSectigoUSERTrustEccRootCAs;
-  if (hostSuffixMatches(host, len, "githubusercontent.com"))    return kIsrgRootCAs;
-  if (hostSuffixMatches(host, len, "vrs-standing-data.adsb.lol")) return kGlobalSignEccRootCAs;
-  return nullptr;  // unmapped host: fail TLS setup cleanly
-}
-
-// Attach the host's smallest root bundle and start a verified request.
-// allowInsecure (OTA only) may setInsecure() past OTA_CA_EXPIRY - but never as
-// a retry after a validation failure, which would let a MITM defeat it.
-bool httpsBegin(HTTPClient& http, NetworkClientSecure& sec, const char* url, bool allowInsecure) {
-  const char* trust = trustStoreForUrl(url);
-  if (!trust) return false;  // unmapped host: no bundle to validate with
-  if (allowInsecure && time(nullptr) >= (time_t)OTA_CA_EXPIRY) sec.setInsecure();
-  else sec.setCACert(trust);
+bool httpsBegin(HTTPClient& http, NetworkClientSecure& sec, const char* url) {
+  sec.setCACertBundle(kMozBundleStart, kMozBundleEnd - kMozBundleStart);
   return http.begin(sec, url);
 }
 
@@ -1122,8 +907,7 @@ static bool tlsArenaResume() {
 static NetworkClientSecure* volatile g_tlsInFlight = nullptr;
 
 int httpsRequestRetry(HTTPClient& http, NetworkClientSecure& sec, const char* url,
-                      int method, const String& body, const char* const* headers,
-                      bool allowInsecure) {
+                      int method, const String& body, const char* const* headers) {
   // HTTP/1.0 keeps the body unchunked so callers can stream-parse without
   // buffering; keep-alive is moot since we reconnect per attempt.
   http.useHTTP10(true);
@@ -1145,7 +929,7 @@ int httpsRequestRetry(HTTPClient& http, NetworkClientSecure& sec, const char* ur
                     (unsigned)heap_caps_get_largest_free_block(MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT),
                     s_tlsHeap ? (unsigned)multi_heap_free_size(s_tlsHeap) : 0);
     }
-    if (!httpsBegin(http, sec, url, allowInsecure)) continue;   // connect failed -> retry
+    if (!httpsBegin(http, sec, url)) continue;   // connect failed -> retry
     if (headers) {
       for (int i = 0; headers[i] && headers[i + 1]; i += 2) {
         if (headers[i + 1][0]) http.addHeader(headers[i], headers[i + 1]);
@@ -1324,11 +1108,11 @@ bool openskyEnsureToken() {
   String body = "grant_type=client_credentials&client_id=" + urlEncode(g_osClientId) +
                 "&client_secret=" + urlEncode(g_osClientSecret);
   const char* tokenHdrs[] = { "Content-Type", "application/x-www-form-urlencoded", nullptr };
-  int code = httpsRequestRetry(http, sec, kOsTokenUrl, HTTPS_METHOD_POST, body, tokenHdrs, false);
+  int code = httpsRequestRetry(http, sec, kOsTokenUrl, HTTPS_METHOD_POST, body, tokenHdrs);
   if (isDevBuild()) Serial.printf("[net] OpenSky token response code=%d\n", code);
   if (code < 0) {
     g_osHandshakeFailed = true;
-    if (isDevBuild()) tlsProbePeer("auth.opensky-network.org", kIsrgRootCAs);
+    if (isDevBuild()) tlsProbePeer("auth.opensky-network.org", nullptr);
     return false;   // TLS/transport failure on all attempts
   }
   if (code == HTTP_CODE_UNAUTHORIZED || code == HTTP_CODE_BAD_REQUEST) return false;  // genuine bad creds
@@ -1459,7 +1243,7 @@ void fetchFlights() {
   String authHdr;
   if (authed) authHdr = "Bearer " + g_osToken;
   const char* flightHdrs[] = { "Authorization", authHdr.c_str(), nullptr };
-  int code = httpsRequestRetry(http, sec, osurl, HTTPS_METHOD_GET, "", flightHdrs, false);
+  int code = httpsRequestRetry(http, sec, osurl, HTTPS_METHOD_GET, "", flightHdrs);
   g_authChecked = true;   // we've made a real OpenSky attempt; auth state is now meaningful
   // Negative code = transport/TLS failure (transient), not bad creds - keep
   // the last auth state; the next poll recovers.
@@ -1482,7 +1266,7 @@ void fetchFlights() {
       const char* retryHdrs[] = { "Authorization", authHdr.c_str(), nullptr };
       http.setTimeout(5000);
       http.collectHeaders(hdrKeys, 2);
-      code = httpsRequestRetry(http, sec, osurl, HTTPS_METHOD_GET, "", retryHdrs, false);
+      code = httpsRequestRetry(http, sec, osurl, HTTPS_METHOD_GET, "", retryHdrs);
       if (isDevBuild()) Serial.printf("[net] 401 retried with fresh token code=%d\n", code);
     } else {
       // Couldn't mint a new token - openskyEnsureToken() already classified
@@ -1788,7 +1572,7 @@ bool geocodeAddress() {
   HTTPClient http;
   http.setTimeout(5000);
   // User-Agent is set centrally in httpsRequestRetry (appUserAgent()).
-  int code = httpsRequestRetry(http, sec, url.c_str(), HTTPS_METHOD_GET, "", nullptr, false);
+  int code = httpsRequestRetry(http, sec, url.c_str(), HTTPS_METHOD_GET, "", nullptr);
   if (code != HTTP_CODE_OK) {
     http.end();
     snprintf(lastErr, sizeof lastErr, "geo %d", code);

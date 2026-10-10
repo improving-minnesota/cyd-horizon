@@ -36,50 +36,36 @@ stored credentials.
 Firmware is delivered over HTTPS from this repository's GitHub releases and is
 authenticated at two independent layers:
 
-- **Transport (TLS certificate verification).** The release-metadata
-  request (`api.github.com`) is verified against the `kSectigoUSERTrustEccRootCAs`
-  bundle (Sectigo / USERTrust ECC), and the firmware download
-  (`objects.githubusercontent.com`) is verified against the `kIsrgRootCAs`
-  bundle (ISRG / Let's Encrypt). Both bundles are embedded in
-  `cyd-horizon.ino` and selected by `trustStoreForUrl()`. The device never
-  retries an unverified connection after a certificate-validation failure, so a
+- **Transport (TLS certificate verification).** Both the release-metadata
+  request (`api.github.com`) and the firmware download
+  (`objects.githubusercontent.com`) are verified against the CA bundle built
+  into the firmware (the core's Mozilla root store). The device never retries
+  an unverified connection after a certificate-validation failure, so a
   man-in-the-middle cannot force it to skip verification.
 - **Content integrity (SHA-256).** The streamed firmware image is hashed and
   compared against the asset digest published by the GitHub API before it is
   flashed. A mismatch aborts the update without touching the running slot.
 
-**The single exception — expired CA certificates.** A firmware build only falls
-back to skipping certificate validation when its bundled root certificates have
-passed their expiry (`OTA_CA_EXPIRY`). This exists so that a device running
-stale firmware that predates a GitHub certificate rotation can still update. In
-practice this means only firmware whose embedded CA bundle is already expired
-runs without certificate verification; current firmware keeps a valid bundle
-and always verifies.
-
-> **Residual risk.** During that fallback window the download is not
-> certificate-verified, and because the asset digest is fetched over the same
-> unauthenticated channel it provides no protection there either. The safe
-> mitigation is to keep the device on current firmware so its CA bundle stays
-> valid. Code-signing the firmware image would close this gap entirely and is
-> the recommended hardening path if that fallback window is unacceptable.
+**No insecure fallback.** Earlier firmware skipped certificate validation when
+its bundled roots had passed their expiry (`OTA_CA_EXPIRY`), so a stale device
+could still update. Verification now uses the core's Mozilla bundle, which is
+refreshed by firmware updates, so that window is gone: every HTTPS connection,
+OTA included, is certificate-verified. A device too old to verify a current
+root must be updated over USB.
 
 ## Third-party API (data provider) TLS
 
 The non-OTA HTTPS calls — OpenSky (token exchange, flight data, and flight
 history), the weather provider (open-meteo), the address geocoder (Nominatim),
 Govee pool-temp, and the ADSB.lol static route mirror — are all TLS-verified
-against root-CA bundles embedded in the firmware. OpenSky, open-meteo, and
-Nominatim are Let's Encrypt signed and use the shared `kIsrgRootCAs` bundle
-(ISRG Root X1 + X2 and the Let's Encrypt intermediate chain); Govee is
-Amazon-signed and uses `kAmazonRootCAs`; `vrs-standing-data.adsb.lol` is
-Google Trust Services / GlobalSign signed and uses `kGlobalSignEccRootCAs` (GlobalSign
-ECC Root CA - R4 bundled with the WE1 intermediate). There is no fallback
-bundle; an unmapped host fails TLS
-setup rather than loading a bundle that may not cover its chain. Unlike
-the OTA path there is **no** `setInsecure()` fallback, so a certificate
-validation failure is never downgraded to an insecure connection. Transient
-transport/TLS failures are retried a few times (`httpsRequestRetry`) before
-being reported. A genuine OpenSky credential rejection (a non-200 response from
+against the core's built-in Mozilla CA bundle. One host
+(`vrs-standing-data.adsb.lol`) is documented to sometimes omit its
+intermediate, which a roots-only store can't build; it currently sends the full
+chain and verifies, and DEVELOPER.md records the fallback to add if that
+changes. There is **no** `setInsecure()` fallback on any path, so a certificate
+validation failure is never downgraded to an insecure connection. Transient transport/TLS failures are retried a few times
+(`httpsRequestRetry`) before being reported. A genuine OpenSky credential
+rejection (a non-200 response from
 the token exchange, or a 401 on the flight-data call) is surfaced as a
 failed-auth state rather than falling back to anonymous, so a man-in-the-middle
 cannot quietly capture credentials by defeating verification. A mere transport

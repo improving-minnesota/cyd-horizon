@@ -1,6 +1,6 @@
 // ota.ino - firmware OTA from the project's GitHub releases: query latest,
 // compare semver, download + flash to the inactive slot, reboot. Verified TLS
-// with a time-gated insecure fallback; integrity pinned by the asset's SHA-256
+// against the built-in CA bundle; integrity pinned by the asset's SHA-256
 // digest. See DEVELOPER.md "OTA updates".
 
 #include <NetworkClientSecure.h>
@@ -8,8 +8,7 @@
 #include <esp_ota_ops.h>
 #include "mbedtls/sha256.h"
 
-// Per-host trust stores: GitHub API via kSectigoUSERTrustEccRootCAs, release
-// assets via kIsrgRootCAs (cyd-horizon.ino).
+// Verified TLS via the built-in CA bundle (see httpsBegin() in cyd-horizon.ino).
 
 #define OTA_REPO    "improving-minnesota/cyd-horizon"
 // Per-board release asset. Firmware predating board-named assets can't OTA
@@ -61,10 +60,9 @@ bool fetchLatestRelease(String& versionOut, String& assetUrlOut, String& sha256O
   HTTPClient http;
   http.setConnectTimeout(5000);   // bound the TCP connect/TLS handshake, not just the read
   http.setTimeout(10000);
-  // Shared verified-TLS helper; allowInsecure only falls back to setInsecure()
-  // past OTA_CA_EXPIRY so a root rotation can't block updates.
+  // Shared verified-TLS helper (built-in CA bundle).
   const char* ghHdrs[] = { "Accept", "application/vnd.github+json", nullptr };
-  int code = httpsRequestRetry(http, sec, OTA_API_URL, HTTPS_METHOD_GET, "", ghHdrs, /*allowInsecure=*/true);
+  int code = httpsRequestRetry(http, sec, OTA_API_URL, HTTPS_METHOD_GET, "", ghHdrs);
   if (code != HTTP_CODE_OK) { http.end(); return false; }
 
   JsonDocument filter;
@@ -273,9 +271,9 @@ bool performOTA(const String& url, const String& version, const String& expected
       http.setTimeout(20000);
       http.setFollowRedirects(HTTPC_DISABLE_FOLLOW_REDIRECTS);
       if (useHttps) {
-        // Keep `sec` alive for the full request; httpsBegin selects the bundle
-        // from the current request URL, including the redirected asset host.
-        connected = httpsBegin(http, sec, requestUrl.c_str(), /*allowInsecure=*/true);
+        // Keep `sec` alive for the full request; each redirect host gets its
+        // own verified connection (httpsBegin attaches the trust store).
+        connected = httpsBegin(http, sec, requestUrl.c_str());
       } else {
         // Plain HTTP path (local dev server).
         connected = http.begin(plainClient, requestUrl.c_str());
