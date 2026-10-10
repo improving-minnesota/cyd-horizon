@@ -463,20 +463,12 @@ releases. All of this lives in `cyd-horizon/ota.ino`.
 ### TLS
 
 Verified HTTPS connections use `httpsBegin()`/`httpsRequestRetry()`, which
-picks the smallest bundled root set that covers the target host:
-
-- `kIsrgRootCAs` — OpenSky, open-meteo, Nominatim, and GitHub release assets
-  (`*.githubusercontent.com`) (ISRG / Let's Encrypt).
-- `kAmazonRootCAs` — Govee (Amazon Root CA 1).
-- `kSectigoUSERTrustEccRootCAs` — GitHub API hostnames (`github.com`, `api.github.com`)
-  (Sectigo / USERTrust ECC root).
-- `kGlobalSignEccRootCAs` — `vrs-standing-data.adsb.lol` route data (GlobalSign ECC
-  Root CA - R4, bundled with the WE1 intermediate because the server does not
-  always send the full chain).
-
-There is no fallback bundle; an unmapped host returns `nullptr` from
-`trustStoreForUrl()` and `httpsBegin()` fails cleanly rather than silently using
-a bundle that may not cover the host's chain.
+verify against the **built-in Mozilla CA bundle** compiled into the core
+(`_binary_x509_crt_bundle_start`, attached with `setCACertBundle()`). It is
+refreshed with core updates, so a new or rotated root no longer needs a
+firmware change, and it is looked up by root subject — a handshake parses only
+the matching root instead of a whole PEM bundle. It carries **roots only**, so
+a server that omits its intermediate can't have its chain built from it.
 
 ### OpenSky authentication
 
@@ -498,11 +490,11 @@ avoid hammering the API.
 TLS/HTTP/parse failures and `Weather Data Unavailable` for failed open-meteo
 fetches, keeping the LED and border in sync with the data state.
 
-`OTA_CA_EXPIRY` is still the earliest root expiry; past that **only the OTA
-path** falls back to `setInsecure(true)` so a root rotation can't block
-updates. Data fetches never take that fallback. There is **no** insecure retry
-on a failed handshake — that would let a man-in-the-middle defeat certificate
-validation.
+There is **no** insecure fallback on any path. Verification uses the core's
+built-in Mozilla bundle (see "TLS" above), which is refreshed with firmware
+updates, so a root rotation no longer needs a firmware change; a failed
+handshake is never downgraded to an unverified connection — that would let a
+man-in-the-middle defeat certificate validation.
 Transient transport failures on these
 verified connections (e.g. a connect dropped after prolonged uptime) are retried
 a few times with clean socket teardown between attempts — always over the same
@@ -539,40 +531,24 @@ spinlock guards the multi_heap (a FreeRTOS semaphore is NOT interchangeable —
 it deadlocks). Dev builds log `arenafree=` around each TLS attempt plus
 `arena-miss`/`both-fail` diagnostics.
 
-**ISRG bundle contents** (`kIsrgRootCAs`, four anchors):
-
-| Cert | Role |
-|---|---|
-| ISRG Root X1 | Anchors classic chains (leaf → R10–R14/E5–E9 → X1) *and* Gen-Y chains that cross-sign Root YR/YE under X1 |
-| ISRG Root X2 | ECDSA root — anchors chains that terminate at X2 |
-| Root YR (self-signed) | Anchors a bare Gen-Y RSA chain served *without* the X1 cross-sign |
-| Root YE (self-signed) | Same for Gen-Y ECDSA |
-
-Deliberately **omitted** — servers send these on the wire, so bundling them
-only costs handshake-parse heap (~2 KB per cert) with no coverage gain: the
-X1/YR and X1/YE *cross-signed* root variants, and intermediates (YR1/YR2,
-YE1/YE2, R10–R14, E5–E9). An intermediate must never be bundled as a trust
-anchor for a host whose chain already terminates at a real root — it just
-adds parse cost. (One exception exists in `kGlobalSignEccRootCAs`: the WE1
-intermediate is bundled because that server sometimes omits it.)
-
-**Refreshing the bundle.** Get canonical PEMs from Let's Encrypt's
-[certificate pages](https://letsencrypt.org/certificates/) (chains section
-lists self-signed roots and cross-signs — take the *self-signed* roots only).
-To check what a live host actually serves:
+**Known risk — omitted intermediates.** The built-in store carries roots only,
+so a server that does not send its intermediate can't have its chain built.
+`vrs-standing-data.adsb.lol` is documented to do this intermittently (its WE1
+intermediate); it currently sends the full chain and verifies. If its route
+lookups start failing (`-9984` / `NOT_TRUSTED`) while other hosts are fine, add
+a pinned intermediate-as-anchor fallback for that host — a `setCACert()` retry
+with the WE1 bundle, as an earlier revision did — rather than reverting the
+built-in bundle. Check what a host serves with:
 
 ```sh
-openssl s_client -connect auth.opensky-network.org:443 -servername auth.opensky-network.org -showcerts </dev/null
+openssl s_client -connect vrs-standing-data.adsb.lol:443 -servername vrs-standing-data.adsb.lol -showcerts </dev/null
 ```
 
-Extract each `BEGIN/END CERTIFICATE` block and inspect with
-`openssl x509 -noout -subject -issuer -dates`. If the chain ends at a root not
-in `kIsrgRootCAs`, add that self-signed root — not the cross-signed variant,
-not the intermediate. On-device verification (dev builds): the probe logs the
-served chain and runs `mbedtls_x509_crt_verify()` against the bundle; `ret=0
-flags=0x0` is success, `flags=0x8` (`NOT_TRUSTED`) means the anchor is missing
-or the heap is too starved to finish parsing — check `arena-miss`/`both-fail`
-counters before assuming the bundle is wrong.
+On-device verification (dev builds): the probe logs the served chain and (when
+handed a bundle) runs `mbedtls_x509_crt_verify()`; `ret=0 flags=0x0` is success,
+`flags=0x8` (`NOT_TRUSTED`) means the anchor is missing or the heap is too
+starved to finish parsing — check `arena-miss`/`both-fail` counters before
+assuming the trust store is wrong.
 
 ### HTTP body streaming and JSON parsing
 
