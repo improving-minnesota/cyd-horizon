@@ -8,6 +8,28 @@
 * don't tear down the net task's TLS client from the OTA task ([#172](https://github.com/improving-minnesota/cyd-horizon/issues/172)) ([669eb6e](https://github.com/improving-minnesota/cyd-horizon/commit/669eb6e113514f88715c6e7c5b2b10fcac62d148))
 * verify TLS against the built-in Mozilla CA bundle ([#171](https://github.com/improving-minnesota/cyd-horizon/issues/171)) ([8856181](https://github.com/improving-minnesota/cyd-horizon/commit/8856181bc412e035ae0863eb38131a723fc29888))
 
+
+### Update by Flashing
+
+Previous versions may not be able to update: pressing **Install** can crash-loop the device. Update over USB (flashing) with a browser instead. This keeps your WiFi, settings, touch calibration, airline logos and graph history.
+
+1. Download the file for your board from the [v3.9.1 release](https://github.com/improving-minnesota/cyd-horizon/releases/tag/v3.9.1):
+   - 4" screen: [`cyd-horizon-e32r40t.ino.bin`](https://github.com/improving-minnesota/cyd-horizon/releases/download/v3.9.1/cyd-horizon-e32r40t.ino.bin)
+   - 2.8" screen: [`cyd-horizon-2432s028r.ino.bin`](https://github.com/improving-minnesota/cyd-horizon/releases/download/v3.9.1/cyd-horizon-2432s028r.ino.bin)
+2. Plug in the board. In **Chrome or Edge**, open **https://espressif.github.io/esptool-js/**.
+3. Set **Baudrate** to **115200**, click **Connect**, and choose the board's port.
+4. Click **Add File** twice, using the same file for both rows. **Each new row defaults to `0x1000`, so you must change both addresses:**
+
+   | Row | Address | File |
+   |---|---|---|
+   | 1 | `0x10000` | your `.ino.bin` |
+   | 2 | `0x190000` | the same `.ino.bin` |
+
+   Check them before continuing. `0x1000` has one zero fewer than `0x10000`. Writing to `0x1000` overwrites the bootloader and your saved settings, and the board will stop booting.
+5. Click **Program** (about 3 minutes), then reboot the device.
+
+Do **not** click **Erase Flash** or add any other files. If Connect fails, hold **BOOT** while plugging in USB.
+
 ## 3.9.0 (2026-09-23) — **REMOVED**
 
 > Release and tag withdrawn: the 3.9.0 firmware could not complete a TLS
