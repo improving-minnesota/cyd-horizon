@@ -141,7 +141,7 @@ void fetchRoute(const char* icao24) {
   String authHdr;
   if (openskyEnsureToken()) authHdr = "Bearer " + g_osToken;
   const char* routeHdrs[] = { "Authorization", authHdr.c_str(), nullptr };
-  int code = httpsRequestRetry(http, sec, url.c_str(), HTTPS_METHOD_GET, "", routeHdrs, false);
+  int code = httpsRequestRetry(http, sec, url.c_str(), HTTPS_METHOD_GET, "", routeHdrs);
   String rem = http.header("X-Rate-Limit-Remaining");
   if (rem.length()) g_flightsCredits = rem.toInt();
   bool parsedOk = false;
@@ -207,7 +207,7 @@ void fetchTrack(const char* icao24) {
   String authHdr;
   if (openskyEnsureToken()) authHdr = "Bearer " + g_osToken;
   const char* trackHdrs[] = { "Authorization", authHdr.c_str(), nullptr };
-  int code = httpsRequestRetry(http, sec, url.c_str(), HTTPS_METHOD_GET, "", trackHdrs, false);
+  int code = httpsRequestRetry(http, sec, url.c_str(), HTTPS_METHOD_GET, "", trackHdrs);
   String rem = http.header("X-Rate-Limit-Remaining");
   if (rem.length()) g_tracksCredits = rem.toInt();
   bool parsedOk = false;
@@ -312,7 +312,7 @@ void fetchAdsbRoute(const char* callsign) {
   String url = String("https://vrs-standing-data.adsb.lol/routes/") + String(cs).substring(0, 2) + "/" + cs + ".json";
   NetworkClientSecure sec;
   HTTPClient http;
-  int code = httpsRequestRetry(http, sec, url.c_str(), HTTPS_METHOD_GET, "", nullptr, false);
+  int code = httpsRequestRetry(http, sec, url.c_str(), HTTPS_METHOD_GET, "", nullptr);
   bool parsedOk = false;
   if (code == HTTP_CODE_OK) {
     HttpBodyStream body(http);  // adsb.lol sends Content-Length, not chunked

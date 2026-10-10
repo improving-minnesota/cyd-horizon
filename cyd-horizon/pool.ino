@@ -100,7 +100,7 @@ bool fetchGoveeDevices() {
   http.collectHeaders(kGoveeRlKeys, kGoveeRlKeyCount);
   const char* devHdrs[] = { "Govee-API-Key", g_goveeKey.c_str(), nullptr };
   int code = httpsRequestRetry(http, sec, "https://openapi.api.govee.com/router/api/v1/user/devices",
-                               HTTPS_METHOD_GET, "", devHdrs, false);
+                               HTTPS_METHOD_GET, "", devHdrs);
   g_goveeAuthBad = (code == HTTP_CODE_UNAUTHORIZED || code == HTTP_CODE_FORBIDDEN);
   if (code == HTTP_CODE_TOO_MANY_REQUESTS) { noteGoveeRateLimit(http); http.end(); return false; }
   if (code != HTTP_CODE_OK) { http.end(); return false; }
@@ -157,7 +157,7 @@ bool fetchGoveeTemp() {
   http.collectHeaders(kGoveeRlKeys, kGoveeRlKeyCount);
   const char* tempHdrs[] = { "Govee-API-Key", g_goveeKey.c_str(), "Content-Type", "application/json", nullptr };
   int code = httpsRequestRetry(http, sec, "https://openapi.api.govee.com/router/api/v1/device/state",
-                               HTTPS_METHOD_POST, requestBody, tempHdrs, false);
+                               HTTPS_METHOD_POST, requestBody, tempHdrs);
   g_goveeAuthBad = (code == HTTP_CODE_UNAUTHORIZED || code == HTTP_CODE_FORBIDDEN);
   if (code == HTTP_CODE_TOO_MANY_REQUESTS) { noteGoveeRateLimit(http); g_poolValid = false; http.end(); return false; }
   if (code != HTTP_CODE_OK) { g_poolValid = false; http.end(); return false; }
