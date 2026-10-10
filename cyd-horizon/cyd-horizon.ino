@@ -6,6 +6,7 @@
 #include <HTTPClient.h>
 #include "http_body.h"
 #include <NetworkClientSecure.h>
+#include <lwip/sockets.h>   // shutdown() for the OTA stalled-fetch nudge
 #include <ArduinoJson.h>
 #include <Preferences.h>
 #include <SPI.h>
@@ -3462,16 +3463,19 @@ void otaTaskEntry(void*) {
     drawOtaHeader(g_otaVersion);
     // Wait for in-flight net fetches: two tasks doing HTTP/lwIP at once can
     // trip a FreeRTOS xTaskPriorityDisinherit assert. A fetch stalled in a
-    // socket read would hold OTA for its whole retry span, so after a grace
-    // period force-close its registered client - the read aborts, the fetch
-    // unwinds, and netBusy clears. stop() self-guards on an already-closed
-    // socket, so a raced cleanup on the net side is a no-op.
-    unsigned long busyWait = 0;
+    // socket read would hold OTA for its whole retry span, so nudge its socket
+    // after a grace period to wake the blocked read. Nudge with shutdown(),
+    // NOT stop(): the net task owns the client's teardown, and a second stop()
+    // here races its own stop()/connect() and double-frees the mbedtls context
+    // (heap corruption - it crashed on v3.9.0). shutdown() only wakes the recv;
+    // the fetch unwinds, clears netBusy, and tears its own client down.
+    unsigned long busyWait = 0, lastNudge = 0;
     while (netBusy) {
-      if (busyWait >= 2000 && g_tlsInFlight) {
+      if (busyWait >= 2000 && g_tlsInFlight && busyWait - lastNudge >= 1000) {
         NetworkClientSecure* c = g_tlsInFlight;
-        g_tlsInFlight = nullptr;
-        c->stop();
+        int sock = c->fd();
+        if (sock >= 0) shutdown(sock, SHUT_RDWR);
+        lastNudge = busyWait;
       }
       vTaskDelay(20);
       busyWait += 20;
