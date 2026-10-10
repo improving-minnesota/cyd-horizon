@@ -1,6 +1,6 @@
 # Changelog
 
-## [3.9.1](https://github.com/improving-minnesota/cyd-horizon/compare/v3.9.0...v3.9.1) (2026-10-10)
+## [3.9.1](https://github.com/improving-minnesota/cyd-horizon/releases/tag/v3.9.1) (2026-10-10)
 
 
 ### Bug Fixes
@@ -8,14 +8,21 @@
 * don't tear down the net task's TLS client from the OTA task ([#172](https://github.com/improving-minnesota/cyd-horizon/issues/172)) ([669eb6e](https://github.com/improving-minnesota/cyd-horizon/commit/669eb6e113514f88715c6e7c5b2b10fcac62d148))
 * verify TLS against the built-in Mozilla CA bundle ([#171](https://github.com/improving-minnesota/cyd-horizon/issues/171)) ([8856181](https://github.com/improving-minnesota/cyd-horizon/commit/8856181bc412e035ae0863eb38131a723fc29888))
 
-## [3.9.0](https://github.com/improving-minnesota/cyd-horizon/compare/v3.8.3...v3.9.0) (2026-09-23)
+## 3.9.0 (2026-09-23) — **REMOVED**
+
+> Release and tag withdrawn: the 3.9.0 firmware could not complete a TLS
+> handshake to the Let's Encrypt-signed hosts once the Gen-Y chain grew, and
+> pressing Install crash-looped the device. Fixed in 3.9.1.
 
 
 ### Features
 
 * add Network reset option to Settings &gt; Reset ([#169](https://github.com/improving-minnesota/cyd-horizon/issues/169)) ([4fa96ea](https://github.com/improving-minnesota/cyd-horizon/commit/4fa96ea6a1a0f743f196af9f6d45097dbf72b356))
 
-## [3.8.3](https://github.com/improving-minnesota/cyd-horizon/releases/tag/v3.8.3) (2026-09-20)
+## 3.8.3 (2026-09-20) — **REMOVED**
+
+> Release and tag withdrawn as part of a clean-slate cleanup; superseded by
+> 3.9.1.
 
 
 ### Bug Fixes
