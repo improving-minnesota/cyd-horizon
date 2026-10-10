@@ -1,5 +1,13 @@
 # Changelog
 
+## [3.9.1](https://github.com/improving-minnesota/cyd-horizon/compare/v3.9.0...v3.9.1) (2026-10-10)
+
+
+### Bug Fixes
+
+* don't tear down the net task's TLS client from the OTA task ([#172](https://github.com/improving-minnesota/cyd-horizon/issues/172)) ([669eb6e](https://github.com/improving-minnesota/cyd-horizon/commit/669eb6e113514f88715c6e7c5b2b10fcac62d148))
+* verify TLS against the built-in Mozilla CA bundle ([#171](https://github.com/improving-minnesota/cyd-horizon/issues/171)) ([8856181](https://github.com/improving-minnesota/cyd-horizon/commit/8856181bc412e035ae0863eb38131a723fc29888))
+
 ## [3.9.0](https://github.com/improving-minnesota/cyd-horizon/compare/v3.8.3...v3.9.0) (2026-09-23)
 
 
