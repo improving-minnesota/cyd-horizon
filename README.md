@@ -89,8 +89,19 @@ Once it's set up it runs on your WiFi — no computer needed.
   sweep plays on power-on; waking from deep sleep stays silent. Additionally,
   a chime plays after a firmware update.
 - **Weather** — current temperature, "feels like", humidity, sunrise/sunset,
-  wind direction and speed with gusts (color-coded green/yellow/orange/red), and
-  an 8-day forecast, refreshed every 10 minutes. The current temperature is also
+  wind direction and speed with gusts, and an 8-day forecast, refreshed every
+  10 minutes. Wind speed and gusts fall into color-coded tiers, each from its
+  own value (so a calm day with strong gusts reads green over red):
+
+  | Color | Tier | Sustained wind | Gusts |
+  |---|---|---|---|
+  | 🟢 Green | calm | < 15 mph (< 13 kt) | < 20 mph (< 17 kt) |
+  | 🟡 Yellow | gusty | 15–24 mph (13–21 kt) | 20–34 mph (17–29 kt) |
+  | 🟠 Orange | strong | 25–30 mph (22–26 kt) | 35–45 mph (30–39 kt) |
+  | 🔴 Red | advisory | ≥ 31 mph (≥ 27 kt) | ≥ 46 mph (≥ 40 kt) |
+
+  Red is the NWS **Wind Advisory** level; the lower tiers are tuned to warn
+  earlier. The Metric setting shows km/h. The current temperature is also
   saved on the device (always on) and graphed over Day / Week / Month / Year with the
   low, average, and high.
 

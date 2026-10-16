@@ -13,8 +13,8 @@
 - **Clock & date** — always on top.
 - **Firmware updates** — checks for new firmware once a day and installs it
   over WiFi, or update manually.
-- **Flight recall** — tap the aircraft count to bring the last overhead
-  flight's details back up, even after it's gone.
+- **Flight recall** — tap the aircraft count to show the last overhead
+  flight's details.
 - **Flights overhead** *(optional — on by default)* — a mini radar of live
   aircraft near you: callsign, route, altitude, speed, distance, airline logo,
   and the plane's actual ground track.
@@ -32,6 +32,15 @@
 
 <div class="shot"><img src="DEVELOPER-USERGUIDE-idle.png"
      alt="Idle dashboard: weather, wind and gusts, sunrise/sunset, pool temperature, 8-day forecast"></div>
+
+## 💨 Wind Tiers
+
+| Color | Tier | Sustained | Gusts |
+|---|---|---|---|
+| <span class="wc wc-g">Green</span> | calm | under 15 mph | under 20 mph |
+| <span class="wc wc-y">Yellow</span> | gusty | 15–24 mph | 20–34 mph |
+| <span class="wc wc-o">Orange</span> | strong | 25–30 mph | 35–45 mph |
+| <span class="wc wc-r">Red</span> | advisory | 31+ mph | 46+ mph |
 
 <!-- PANEL -->
 

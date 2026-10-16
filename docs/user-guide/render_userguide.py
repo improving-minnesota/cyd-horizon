@@ -88,7 +88,22 @@ hr { border: none; border-top: 1px solid #999; margin: 5pt 0 3pt; }
 .callout { color: #103a5c; background: linear-gradient(100deg, #e4eff8, #d0e2f0);
            border: 1px solid #7da8c8; border-radius: 5px;
            padding: 5pt 8pt; margin: 6pt 0; }
-.shot { margin: 8pt 0 4pt; }   /* a line of air between text and images */
+/* Wind tier labels: the device's green/yellow/orange/red, darkened so they stay
+   legible on the pale page backgrounds (a bright yellow washes out). */
+.wc { font-weight: 700; }
+.wc-g { color: #1a7f37; }
+.wc-y { color: #9a7b00; }
+.wc-o { color: #c05621; }
+.wc-r { color: #b3392e; }
+/* Wind tier table — the guide's only table. No left padding so the first
+   column lines up with the paragraph text; light rules against the page art. */
+table { border-collapse: collapse; width: 100%; margin: 2pt 0 1pt;
+        font-size: 7.5pt; }
+th, td { padding: 0.3pt 4pt 0.3pt 0; text-align: left; vertical-align: top; }
+th { color: #0b3d66; font-weight: 700; border-bottom: 1.2px solid #7da8c8; }
+td { border-bottom: 0.6px solid #d3e2ef; }
+tr:last-child td { border-bottom: none; }
+.shot { margin: 8pt 0 0; }   /* a line of air between text and images */
 .shot img, img.hero { width: 100%; border: 1px solid #999;
                       border-radius: 4px; }
 /* Front cover: title block at the top, version+source footer pinned to the
@@ -216,7 +231,8 @@ def main():
 
     wrapped = (sheet("out", sides["outside"])
                + sheet("in", sides["inside"]))
-    body = markdown.markdown(wrapped, extensions=["sane_lists", "md_in_html"])
+    body = markdown.markdown(wrapped,
+                             extensions=["sane_lists", "md_in_html", "tables"])
     # Wrap a leading emoji in <h2> so CSS can center it on the header text.
     body = re.sub(r"<h2>(\S+)\s+", r'<h2><span class="ic">\1</span> ', body)
     html = (f"<!doctype html><meta charset='utf-8'>"
