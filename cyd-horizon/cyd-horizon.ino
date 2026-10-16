@@ -2251,13 +2251,13 @@ void drawFlightInfo(Plane& p) {
   tft.setCursor(8, 94);
   tft.setTextColor(TFT_YELLOW, TFT_BLACK);
   if (g_units == UNITS_METRIC) {
-    tft.printf("%d m  %d %s  %.1f km", (int)round(p.altFt * 0.3048f),
+    tft.printf("%dm  %d%s  %.1fkm", (int)round(p.altFt * 0.3048f),
                (int)round(spdDisp(p.spdKt)), spdUnit(), p.distMi * 1.60934f);
   } else if (g_units == UNITS_AVIATION) {
-    tft.printf("%d ft  %d %s  %.1f nm", p.altFt,
+    tft.printf("%dft  %d%s  %.1fnm", p.altFt,
                (int)round(spdDisp(p.spdKt)), spdUnit(), p.distMi * 0.868976f);
   } else {
-    tft.printf("%d ft  %d %s  %.1f mi", p.altFt,
+    tft.printf("%dft  %d%s  %.1fmi", p.altFt,
                (int)round(spdDisp(p.spdKt)), spdUnit(), p.distMi);
   }
 
@@ -2321,7 +2321,7 @@ void drawRadarFrame(int cx, int cy, int r) {
   tft.setTextColor(TFT_LIGHTGREY, TFT_BLACK);
   tft.setTextFont(2);
   tft.setCursor(cx - 12, cy + r + 6);
-  tft.printf("%d %s", (int)round(g_radiusMi * distConv()), distUnit());
+  tft.printf("%d%s", (int)round(g_radiusMi * distConv()), distUnit());
 }
 
 // Draw a dashed (dotted) line segment, used for the ground track so it stays
@@ -2753,15 +2753,15 @@ void drawFlightDetailPage() {
     tft.setCursor(8, 94);
     tft.setTextColor(TFT_YELLOW, TFT_BLACK);
     if (g_units == UNITS_METRIC) {
-      tft.printf("%d m  %d %s  %.1f km", (int)round(g_lastFlight.altFt * 0.3048f),
+      tft.printf("%dm  %d%s  %.1fkm", (int)round(g_lastFlight.altFt * 0.3048f),
                  (int)round(spdDisp(g_lastFlight.spdKt)), spdUnit(),
                  g_lastFlight.distMi * 1.60934f);
     } else if (g_units == UNITS_AVIATION) {
-      tft.printf("%d ft  %d %s  %.1f nm", g_lastFlight.altFt,
+      tft.printf("%dft  %d%s  %.1fnm", g_lastFlight.altFt,
                  (int)round(spdDisp(g_lastFlight.spdKt)), spdUnit(),
                  g_lastFlight.distMi * 0.868976f);
     } else {
-      tft.printf("%d ft  %d %s  %.1f mi", g_lastFlight.altFt,
+      tft.printf("%dft  %d%s  %.1fmi", g_lastFlight.altFt,
                  (int)round(spdDisp(g_lastFlight.spdKt)), spdUnit(),
                  g_lastFlight.distMi);
     }

@@ -60,7 +60,7 @@ static bool isHm(const char* hm) {
          hm[3] >= '0' && hm[3] <= '9' && hm[4] >= '0' && hm[4] <= '9';
 }
 
-// "HH:MM" (24h) for display: 12-hour gets a one-letter marker ("7:47 A"),
+// "HH:MM" (24h) for display: 12-hour gets a one-letter marker ("7:47A"),
 // 24-hour stays as-is. Used for sunrise/sunset.
 String fmtHm12(const char* hm) {
   if (!isHm(hm)) return "--";
@@ -71,7 +71,7 @@ String fmtHm12(const char* hm) {
     snprintf(b, sizeof b, "%d:%02d", h, m);
   } else {
     int h12 = h % 12; if (h12 == 0) h12 = 12;
-    snprintf(b, sizeof b, "%d:%02d %c", h12, m, (h < 12) ? 'A' : 'P');
+    snprintf(b, sizeof b, "%d:%02d%c", h12, m, (h < 12) ? 'A' : 'P');
   }
   return String(b);
 }
@@ -385,10 +385,10 @@ void drawIdle() {
   if (g_windValid) drawWindArrow(50, top + 116, 8, g_windDir, wcol);
   if (g_windValid) {
     tft.setCursor(8, top + 126);
-    tft.printf("%s %d %s", windDir8(g_windDir), (int)round(spdDisp(g_windKt)), spdUnit());
+    tft.printf("%s %d%s", windDir8(g_windDir), (int)round(spdDisp(g_windKt)), spdUnit());
     tft.setTextColor(windCol(g_gustKt, true), TFT_BLACK);
     tft.setCursor(8, top + 144);
-    tft.printf("Gusts %d %s", (int)round(spdDisp(g_gustKt)), spdUnit());
+    tft.printf("Gusts %d%s", (int)round(spdDisp(g_gustKt)), spdUnit());
   } else {
     tft.setTextColor(TFT_LIGHTGREY, TFT_BLACK);
     tft.setCursor(8, top + 126); tft.print("--");
