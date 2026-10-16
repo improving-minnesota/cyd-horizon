@@ -1,5 +1,12 @@
 # Changelog
 
+## [3.10.5](https://github.com/improving-minnesota/cyd-horizon/compare/v3.10.4...v3.10.5) (2026-10-16)
+
+
+### Bug Fixes
+
+* degree sign for temperatures, no space before other units ([#187](https://github.com/improving-minnesota/cyd-horizon/issues/187)) ([16840bd](https://github.com/improving-minnesota/cyd-horizon/commit/16840bd05380d036f359d98faffcecc9943238c3))
+
 ## [3.10.4](https://github.com/improving-minnesota/cyd-horizon/compare/v3.10.3...v3.10.4) (2026-10-16)
 
 
