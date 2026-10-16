@@ -355,6 +355,29 @@ const char* unitsName() { return g_units == UNITS_METRIC ? "Metric" : (g_units =
 // Temps stored as F; converted at display so stored history survives unit switches.
 float tempDisp(float f) { return g_units == UNITS_IMPERIAL ? f : (f - 32.0f) * 5.0f / 9.0f; }
 char  tempUnit()        { return g_units == UNITS_IMPERIAL ? 'F' : 'C'; }
+// Degree mark after a temperature value. The GLCD fonts (2.8" board) carry a
+// ring at 0x60 - the grave is remapped to a degree - but the 4" board draws
+// with FreeFonts, whose 0x20-0x7E range has no degree, so draw the ring there
+// instead. `r` sizes it to the active font tier (2 for body text, 4 for the
+// big readings); the advance matches the GLCD ring's own.
+void printDegree(int r) {
+#ifdef CYD_E32R40T
+  int x = tft.getCursorX(), y = tft.getCursorY();
+  tft.drawCircle(x + r, y + r + 1, r, lcd.textcolor);
+  tft.setCursor(x + 2 * r + 1, y);
+#else
+  (void)r;
+  tft.print("\x60");
+#endif
+}
+// A temperature as "99F" / "87.1F" - value, degree mark, unit. `dp` = decimal
+// places (0 for the whole-number readings).
+void printTemp(float v, int dp, int r) {
+  if (dp) tft.printf("%.1f", v);
+  else    tft.printf("%d", (int)round(v));
+  printDegree(r);
+  tft.print(tempUnit());
+}
 // Speeds are stored as knots (flight tracks in knots, and weather.ino asks
 // Open-Meteo for wind in knots), so one converter serves both. Metric is km/h,
 // imperial mph, aviation knots.
@@ -2228,13 +2251,13 @@ void drawFlightInfo(Plane& p) {
   tft.setCursor(8, 94);
   tft.setTextColor(TFT_YELLOW, TFT_BLACK);
   if (g_units == UNITS_METRIC) {
-    tft.printf("%dm  %d %s  %.1fkm", (int)round(p.altFt * 0.3048f),
+    tft.printf("%dm  %d%s  %.1fkm", (int)round(p.altFt * 0.3048f),
                (int)round(spdDisp(p.spdKt)), spdUnit(), p.distMi * 1.60934f);
   } else if (g_units == UNITS_AVIATION) {
-    tft.printf("%dft  %d %s  %.1fnm", p.altFt,
+    tft.printf("%dft  %d%s  %.1fnm", p.altFt,
                (int)round(spdDisp(p.spdKt)), spdUnit(), p.distMi * 0.868976f);
   } else {
-    tft.printf("%dft  %d %s  %.1fmi", p.altFt,
+    tft.printf("%dft  %d%s  %.1fmi", p.altFt,
                (int)round(spdDisp(p.spdKt)), spdUnit(), p.distMi);
   }
 
@@ -2730,15 +2753,15 @@ void drawFlightDetailPage() {
     tft.setCursor(8, 94);
     tft.setTextColor(TFT_YELLOW, TFT_BLACK);
     if (g_units == UNITS_METRIC) {
-      tft.printf("%dm  %d %s  %.1fkm", (int)round(g_lastFlight.altFt * 0.3048f),
+      tft.printf("%dm  %d%s  %.1fkm", (int)round(g_lastFlight.altFt * 0.3048f),
                  (int)round(spdDisp(g_lastFlight.spdKt)), spdUnit(),
                  g_lastFlight.distMi * 1.60934f);
     } else if (g_units == UNITS_AVIATION) {
-      tft.printf("%dft  %d %s  %.1fnm", g_lastFlight.altFt,
+      tft.printf("%dft  %d%s  %.1fnm", g_lastFlight.altFt,
                  (int)round(spdDisp(g_lastFlight.spdKt)), spdUnit(),
                  g_lastFlight.distMi * 0.868976f);
     } else {
-      tft.printf("%dft  %d %s  %.1fmi", g_lastFlight.altFt,
+      tft.printf("%dft  %d%s  %.1fmi", g_lastFlight.altFt,
                  (int)round(spdDisp(g_lastFlight.spdKt)), spdUnit(),
                  g_lastFlight.distMi);
     }
