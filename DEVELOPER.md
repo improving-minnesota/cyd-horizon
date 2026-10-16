@@ -1059,7 +1059,7 @@ read on black), so it can't be read as one of the wind tiers.
   rigid arrow is as wide as it is long once the wind turns E/W, so inside a row
   it either has to shrink or reach into the text. That line also carries the
   `Wind` label, which keeps the readings below at the full column width — what
-  makes a 3-digit gust (`Gusts 161km/h`) and a 3-digit sustained speed fit.
+  makes a 3-digit gust (`Gusts 161 km/h`) and a 3-digit sustained speed fit.
 - **Gusts.** In the `current` block `wind_speed_10m` is an instantaneous value
   while `wind_gusts_10m` is the *preceding hour's maximum*, so the Gusts row
   reads as the worst recent gust, not an instantaneous one.

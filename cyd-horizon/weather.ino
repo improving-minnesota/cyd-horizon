@@ -385,10 +385,10 @@ void drawIdle() {
   if (g_windValid) drawWindArrow(50, top + 116, 8, g_windDir, wcol);
   if (g_windValid) {
     tft.setCursor(8, top + 126);
-    tft.printf("%s %d%s", windDir8(g_windDir), (int)round(spdDisp(g_windKt)), spdUnit());
+    tft.printf("%s %d %s", windDir8(g_windDir), (int)round(spdDisp(g_windKt)), spdUnit());
     tft.setTextColor(windCol(g_gustKt, true), TFT_BLACK);
     tft.setCursor(8, top + 144);
-    tft.printf("Gusts %d%s", (int)round(spdDisp(g_gustKt)), spdUnit());
+    tft.printf("Gusts %d %s", (int)round(spdDisp(g_gustKt)), spdUnit());
   } else {
     tft.setTextColor(TFT_LIGHTGREY, TFT_BLACK);
     tft.setCursor(8, top + 126); tft.print("--");
