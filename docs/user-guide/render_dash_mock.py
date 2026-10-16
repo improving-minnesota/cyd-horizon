@@ -595,7 +595,7 @@ def draw_flight(d):
     if name:
         txt(8, 80, 11, "#0ff", name[:26])
     txt(8, 100, 11, "#ff0",
-        f'{feat["altFt"]}ft  {feat["mph"]}mph  {feat["dist"]:.1f}mi')
+        f'{feat["altFt"]}ft  {feat["mph"]} mph  {feat["dist"]:.1f}mi')
     rt = d["route"]
     y = 120
     if rt:
