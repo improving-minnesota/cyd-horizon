@@ -698,10 +698,10 @@ def draw_idle(d):
     daily = (d["wx"] or {}).get("daily", {})
     temp = cur.get("temperature_2m", 0)
     top = 42
-    txt(8, top + 24, 26, "#fff", f"{round(temp)} F")
+    txt(8, top + 24, 26, "#fff", f"{round(temp)}°F")
     wx_icon(78, top + 6, cur.get("weather_code", 0))
     txt(8, top + 41, 11, "#ccc",
-        f'FL {round(cur.get("apparent_temperature", temp))} F')
+        f'FL {round(cur.get("apparent_temperature", temp))}°F')
     txt(8, top + 61, 11, "#0ff",
         f'{int(cur.get("relative_humidity_2m", 0))}% hum')
     sr = (daily.get("sunrise") or ["-"])[0]
@@ -725,7 +725,7 @@ def draw_idle(d):
         txt(8, top + 155, 11, "#c0c0c0", "Gusts --")
     if d["pool"] is not None:
         txt(8, top + 173, 11, LAV, "Pool ")
-        txt(50, top + 173, 11, LAV, f'{d["pool"]:.1f} F')
+        txt(50, top + 173, 11, LAV, f'{d["pool"]:.1f}°F')
     x0, y0, w, h = 110, top + 2, 46, 92
     days = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"]
     wd = (MOCK_DT.weekday() + 1) % 7  # Mon=0 -> Sun-first
@@ -807,7 +807,7 @@ def draw_wxgraph(d):
     cur = (d["wx"] or {}).get("current", {})
     txt(gx, gy + gh + 18, 11, "#0ff", f"Lo {lo:.1f}")
     txt(gx + 110, gy + gh + 18, 11, "#fff",
-        f'now {cur.get("temperature_2m", 0):.1f} F')
+        f'now {cur.get("temperature_2m", 0):.1f}°F')
     txt(gx + gw, gy + gh + 18, 11, "#0ff", f"Hi {hi:.1f}", anchor="end")
 
 

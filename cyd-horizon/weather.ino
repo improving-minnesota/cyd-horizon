@@ -348,7 +348,7 @@ void drawIdle() {
   tft.setTextColor(g_weatherValid ? TFT_WHITE : TFT_LIGHTGREY, TFT_BLACK);
   tft.setTextFont(4);
   tft.setCursor(8, top);
-  if (g_weatherValid) tft.printf("%d %c", (int)round(tempDisp(g_temp)), tempUnit());
+  if (g_weatherValid) printTemp(tempDisp(g_temp), 0, 4);
   else tft.print("--");
   tft.setTextSize(1);
   // Current conditions icon, to the right of the big temperature (not below
@@ -359,7 +359,7 @@ void drawIdle() {
   tft.setTextFont(2);
   tft.setTextColor(TFT_LIGHTGREY, TFT_BLACK);
   tft.setCursor(8, top + 30);
-  if (g_weatherValid) tft.printf("FL %d %c", (int)round(tempDisp(g_feels)), tempUnit());
+  if (g_weatherValid) { tft.print("FL "); printTemp(tempDisp(g_feels), 0, 2); }
   else tft.print("FL --");
   tft.setTextColor(g_weatherValid ? TFT_CYAN : TFT_LIGHTGREY, TFT_BLACK);
   tft.setCursor(8, top + 50);
@@ -404,7 +404,7 @@ void drawIdle() {
     tft.setTextFont(2);
     tft.setTextColor(g_poolValid ? TFT_LAVENDER : TFT_LIGHTGREY, TFT_BLACK);
     tft.setCursor(8, top + 162); tft.print("Pool ");
-    if (g_poolValid) tft.printf("%.1f %c", poolDisp(g_poolTemp), tempUnit());
+    if (g_poolValid) printTemp(poolDisp(g_poolTemp), 1, 2);
     else tft.print("--");
   }
 #endif
@@ -603,7 +603,7 @@ void drawWxGraph() {
     tft.printf("Lo %.1f", lo);
     tft.setTextColor(TFT_WHITE, TFT_BLACK);
     tft.setCursor(gx + 110, gy + gh + 6);
-    tft.printf("now %.1f %c", tempDisp(g_temp), tempUnit());
+    tft.print("now "); printTemp(tempDisp(g_temp), 1, 2);
     char hbuf[16];
     snprintf(hbuf, sizeof hbuf, "Hi %.1f", hi);
     tft.drawRightString(hbuf, gx + gw, gy + gh + 6, 2);
