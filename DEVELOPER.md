@@ -1299,11 +1299,15 @@ Data sources: OpenSky `/states/all` + `/tracks/all` and the adsb.lol callsign
 route using `cyd-horizon/.env` creds, Open-Meteo weather, the Govee device
 state API, and a fixed header date/time (`MOCK_DT`) so the screenshots stay
 stable between renders. Fetched data is cached in `mock_data.json` (same
-folder) — renders reuse it, so the PDF doesn't hit the APIs each time; pass
-`--refresh` to re-pull live data and re-save the cache. On a refresh the mock
-scans nearby planes until one has a usable track (`--monitor SECONDS` extends
-the window; `--once` for a single pass). All inputs are optional: with no
-creds/network it still renders with placeholders.
+folder), and renders reuse it deliberately — that keeps every screenshot
+byte-identical between PDF versions, so the PDF doesn't hit the APIs each
+time and a docs change can't churn the images. Re-pulling live data is the
+mock's own explicit step, `render_dash_mock.py --refresh`;
+`render_userguide.py` never forwards that flag and always renders from the
+cache. On a refresh the mock scans nearby planes until one has a usable
+track (`--monitor SECONDS` extends the window; `--once` for a single pass).
+All inputs are optional: with no creds/network it still renders with
+placeholders.
 
 **Page backgrounds** — each side is a full-bleed `.sheet` flex row
 (`@page size: Letter landscape; margin: 0`) carrying a saved background

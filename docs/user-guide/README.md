@@ -27,10 +27,23 @@ cyd-horizon/.venv/bin/python docs/user-guide/render_userguide.py
 ```
 
 Run from the repo root. Requires the `markdown` package and Google Chrome
-at `/Applications/Google Chrome.app/...`. The script also re-renders the
-dashboard screenshots first (cached `mock_data.json`; pass `--refresh` to
-re-pull live data). It refuses to render if `.release-please-manifest.json`
-is stale vs `origin/main`, and warns if the PDF is not exactly 2 pages.
+at `/Applications/Google Chrome.app/...`. It refuses to render if
+`.release-please-manifest.json` is stale vs `origin/main`, and warns if the
+PDF is not exactly 2 pages.
+
+It also re-renders the dashboard screenshots first, **from the cached
+`mock_data.json`. That is deliberate**: rendering from the cache keeps the
+images byte-identical between PDF versions, so a docs change can't churn
+them. Refreshing the mock data is a separate, explicit step:
+
+```sh
+cyd-horizon/.venv/bin/python docs/user-guide/render_dash_mock.py --refresh
+```
+
+`--refresh` belongs to `render_dash_mock.py` alone — `render_userguide.py`
+does not forward it, and always renders from the cache. Run the mock
+directly when you actually want new live data, and expect every screenshot
+to change when you do.
 
 After editing the cover logo SVG, re-render its PNG before rebuilding:
 
