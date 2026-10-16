@@ -405,6 +405,7 @@ bool plotSeries(unsigned long* times, float* temps, float* mins, float* maxs,
 
   if (vmax - vmin < 1.0f) { vmin -= 1.0f; vmax += 1.0f; }   // pad only for y-scale
   int prevX = -1, prevY = -1;
+  unsigned long prevT = 0;
   for (int i = 0; i < count; i++) {
     unsigned long t = times[i];
     if (t < t0 || t > nowSec) continue;
@@ -413,8 +414,11 @@ bool plotSeries(unsigned long* times, float* temps, float* mins, float* maxs,
     int py = gy + gh - (int)((v - vmin) * gh / (vmax - vmin));
     px = constrain(px, gx, gx + gw);
     py = constrain(py, gy, gy + gh);
-    if (prevX >= 0) tft.drawLine(prevX, prevY, px, py, graphLineCol());
-    prevX = px; prevY = py;
+    // The RAM rings store the newest run first, so index order jumps back in
+    // time at the wrap point - break the line there instead of drawing a
+    // full-width segment from the newest sample back to the oldest.
+    if (prevX >= 0 && t >= prevT) tft.drawLine(prevX, prevY, px, py, graphLineCol());
+    prevX = px; prevY = py; prevT = t;
   }
 
   // Dotted horizontal line at the average temperature, with an "avg" label just
