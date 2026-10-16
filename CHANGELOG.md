@@ -1,5 +1,12 @@
 # Changelog
 
+## [3.10.0](https://github.com/improving-minnesota/cyd-horizon/compare/v3.9.1...v3.10.0) (2026-10-16)
+
+
+### Features
+
+* show wind direction, speed and gusts on the idle dashboard ([#176](https://github.com/improving-minnesota/cyd-horizon/issues/176)) ([4b37b53](https://github.com/improving-minnesota/cyd-horizon/commit/4b37b539052d3f42f23601542a105d10e698600d))
+
 ## [3.9.1](https://github.com/improving-minnesota/cyd-horizon/releases/tag/v3.9.1) (2026-10-10)
 
 
