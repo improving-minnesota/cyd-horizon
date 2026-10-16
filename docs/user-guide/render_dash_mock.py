@@ -493,7 +493,7 @@ def radar(d):
     circle(cx, cy, r / 2, "#7b7d7b")
     line(cx - r, cy, cx + r, cy, "#7b7d7b")
     line(cx, cy - r, cx, cy + r, "#7b7d7b")
-    txt(cx - 12, cy + r + 18, 11, "#ccc", f"{round(RADIUS_MI)}mi")
+    txt(cx - 12, cy + r + 18, 11, "#ccc", f"{round(RADIUS_MI)} mi")
 
     # Ground track: cyan dotted polyline over the real /tracks points
     # (clipped against the header band and cog only, like CLIP_DYN_COG).
@@ -595,7 +595,7 @@ def draw_flight(d):
     if name:
         txt(8, 80, 11, "#0ff", name[:26])
     txt(8, 100, 11, "#ff0",
-        f'{feat["altFt"]}ft  {feat["mph"]} mph  {feat["dist"]:.1f}mi')
+        f'{feat["altFt"]} ft  {feat["mph"]} mph  {feat["dist"]:.1f} mi')
     rt = d["route"]
     y = 120
     if rt:
@@ -649,14 +649,14 @@ def wx_icon(x, y, code, day=True):
 
 
 def hm12(v):
-    """12h HH:MMA from either an HH:MM string or a unixtime epoch (local tz)."""
+    """12h HH:MM A from either an HH:MM string or a unixtime epoch (local tz)."""
     import datetime
     try:
         if isinstance(v, int):
             t = datetime.datetime.fromtimestamp(v)
-            return f"{t.hour % 12 or 12}:{t.minute:02d}{'A' if t.hour < 12 else 'P'}"
+            return f"{t.hour % 12 or 12}:{t.minute:02d} {'A' if t.hour < 12 else 'P'}"
         h, m = int(v[:2]), int(v[3:5])
-        return f"{h % 12 or 12}:{m:02d}{'A' if h < 12 else 'P'}"
+        return f"{h % 12 or 12}:{m:02d} {'A' if h < 12 else 'P'}"
     except Exception:
         return "--"
 
@@ -698,10 +698,10 @@ def draw_idle(d):
     daily = (d["wx"] or {}).get("daily", {})
     temp = cur.get("temperature_2m", 0)
     top = 42
-    txt(8, top + 24, 26, "#fff", f"{round(temp)}F")
+    txt(8, top + 24, 26, "#fff", f"{round(temp)} F")
     wx_icon(78, top + 6, cur.get("weather_code", 0))
     txt(8, top + 41, 11, "#ccc",
-        f'FL {round(cur.get("apparent_temperature", temp))}F')
+        f'FL {round(cur.get("apparent_temperature", temp))} F')
     txt(8, top + 61, 11, "#0ff",
         f'{int(cur.get("relative_humidity_2m", 0))}% hum')
     sr = (daily.get("sunrise") or ["-"])[0]
@@ -725,7 +725,7 @@ def draw_idle(d):
         txt(8, top + 155, 11, "#c0c0c0", "Gusts --")
     if d["pool"] is not None:
         txt(8, top + 173, 11, LAV, "Pool ")
-        txt(50, top + 173, 11, LAV, f'{d["pool"]:.1f}F')
+        txt(50, top + 173, 11, LAV, f'{d["pool"]:.1f} F')
     x0, y0, w, h = 110, top + 2, 46, 92
     days = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"]
     wd = (MOCK_DT.weekday() + 1) % 7  # Mon=0 -> Sun-first
@@ -807,7 +807,7 @@ def draw_wxgraph(d):
     cur = (d["wx"] or {}).get("current", {})
     txt(gx, gy + gh + 18, 11, "#0ff", f"Lo {lo:.1f}")
     txt(gx + 110, gy + gh + 18, 11, "#fff",
-        f'now {cur.get("temperature_2m", 0):.1f}F')
+        f'now {cur.get("temperature_2m", 0):.1f} F')
     txt(gx + gw, gy + gh + 18, 11, "#0ff", f"Hi {hi:.1f}", anchor="end")
 
 

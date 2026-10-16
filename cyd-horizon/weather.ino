@@ -60,7 +60,7 @@ static bool isHm(const char* hm) {
          hm[3] >= '0' && hm[3] <= '9' && hm[4] >= '0' && hm[4] <= '9';
 }
 
-// "HH:MM" (24h) for display: 12-hour gets a one-letter marker ("7:47A"),
+// "HH:MM" (24h) for display: 12-hour gets a one-letter marker ("7:47 A"),
 // 24-hour stays as-is. Used for sunrise/sunset.
 String fmtHm12(const char* hm) {
   if (!isHm(hm)) return "--";
@@ -71,7 +71,7 @@ String fmtHm12(const char* hm) {
     snprintf(b, sizeof b, "%d:%02d", h, m);
   } else {
     int h12 = h % 12; if (h12 == 0) h12 = 12;
-    snprintf(b, sizeof b, "%d:%02d%c", h12, m, (h < 12) ? 'A' : 'P');
+    snprintf(b, sizeof b, "%d:%02d %c", h12, m, (h < 12) ? 'A' : 'P');
   }
   return String(b);
 }
@@ -348,7 +348,7 @@ void drawIdle() {
   tft.setTextColor(g_weatherValid ? TFT_WHITE : TFT_LIGHTGREY, TFT_BLACK);
   tft.setTextFont(4);
   tft.setCursor(8, top);
-  if (g_weatherValid) tft.printf("%d%c", (int)round(tempDisp(g_temp)), tempUnit());
+  if (g_weatherValid) tft.printf("%d %c", (int)round(tempDisp(g_temp)), tempUnit());
   else tft.print("--");
   tft.setTextSize(1);
   // Current conditions icon, to the right of the big temperature (not below
@@ -359,7 +359,7 @@ void drawIdle() {
   tft.setTextFont(2);
   tft.setTextColor(TFT_LIGHTGREY, TFT_BLACK);
   tft.setCursor(8, top + 30);
-  if (g_weatherValid) tft.printf("FL %d%c", (int)round(tempDisp(g_feels)), tempUnit());
+  if (g_weatherValid) tft.printf("FL %d %c", (int)round(tempDisp(g_feels)), tempUnit());
   else tft.print("FL --");
   tft.setTextColor(g_weatherValid ? TFT_CYAN : TFT_LIGHTGREY, TFT_BLACK);
   tft.setCursor(8, top + 50);
@@ -404,7 +404,7 @@ void drawIdle() {
     tft.setTextFont(2);
     tft.setTextColor(g_poolValid ? TFT_LAVENDER : TFT_LIGHTGREY, TFT_BLACK);
     tft.setCursor(8, top + 162); tft.print("Pool ");
-    if (g_poolValid) tft.printf("%.1f%c", poolDisp(g_poolTemp), tempUnit());
+    if (g_poolValid) tft.printf("%.1f %c", poolDisp(g_poolTemp), tempUnit());
     else tft.print("--");
   }
 #endif
@@ -603,7 +603,7 @@ void drawWxGraph() {
     tft.printf("Lo %.1f", lo);
     tft.setTextColor(TFT_WHITE, TFT_BLACK);
     tft.setCursor(gx + 110, gy + gh + 6);
-    tft.printf("now %.1f%c", tempDisp(g_temp), tempUnit());
+    tft.printf("now %.1f %c", tempDisp(g_temp), tempUnit());
     char hbuf[16];
     snprintf(hbuf, sizeof hbuf, "Hi %.1f", hi);
     tft.drawRightString(hbuf, gx + gw, gy + gh + 6, 2);

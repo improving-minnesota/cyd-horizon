@@ -269,7 +269,7 @@ void drawPool() {
   tft.setTextColor(g_poolValid ? TFT_GREEN : TFT_LIGHTGREY, TFT_BLACK);
   tft.setTextFont(4);   // font 3 is unused in TFT_eSPI and renders nothing
   tft.setCursor(90, 196);
-  if (g_poolValid) tft.printf("%.1f%c", poolDisp(g_poolTemp), tempUnit());
+  if (g_poolValid) tft.printf("%.1f %c", poolDisp(g_poolTemp), tempUnit());
   else tft.print("--");
   tft.setTextSize(1);
 
@@ -536,7 +536,7 @@ void drawPoolGraph() {
     tft.printf("Lo %.1f", lo);
     tft.setTextColor(TFT_WHITE, TFT_BLACK);
     tft.setCursor(gx + 110, gy + gh + 6);
-    tft.printf("now %.1f%c", poolDisp(g_poolTemp), tempUnit());
+    tft.printf("now %.1f %c", poolDisp(g_poolTemp), tempUnit());
     char hbuf[16];
     snprintf(hbuf, sizeof hbuf, "Hi %.1f", hi);
     tft.drawRightString(hbuf, gx + gw, gy + gh + 6, 2);
