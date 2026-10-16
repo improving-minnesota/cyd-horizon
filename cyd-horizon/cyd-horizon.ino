@@ -2228,13 +2228,13 @@ void drawFlightInfo(Plane& p) {
   tft.setCursor(8, 94);
   tft.setTextColor(TFT_YELLOW, TFT_BLACK);
   if (g_units == UNITS_METRIC) {
-    tft.printf("%dm  %d%s  %.1fkm", (int)round(p.altFt * 0.3048f),
+    tft.printf("%dm  %d %s  %.1fkm", (int)round(p.altFt * 0.3048f),
                (int)round(spdDisp(p.spdKt)), spdUnit(), p.distMi * 1.60934f);
   } else if (g_units == UNITS_AVIATION) {
-    tft.printf("%dft  %d%s  %.1fnm", p.altFt,
+    tft.printf("%dft  %d %s  %.1fnm", p.altFt,
                (int)round(spdDisp(p.spdKt)), spdUnit(), p.distMi * 0.868976f);
   } else {
-    tft.printf("%dft  %d%s  %.1fmi", p.altFt,
+    tft.printf("%dft  %d %s  %.1fmi", p.altFt,
                (int)round(spdDisp(p.spdKt)), spdUnit(), p.distMi);
   }
 
@@ -2730,15 +2730,15 @@ void drawFlightDetailPage() {
     tft.setCursor(8, 94);
     tft.setTextColor(TFT_YELLOW, TFT_BLACK);
     if (g_units == UNITS_METRIC) {
-      tft.printf("%dm  %d%s  %.1fkm", (int)round(g_lastFlight.altFt * 0.3048f),
+      tft.printf("%dm  %d %s  %.1fkm", (int)round(g_lastFlight.altFt * 0.3048f),
                  (int)round(spdDisp(g_lastFlight.spdKt)), spdUnit(),
                  g_lastFlight.distMi * 1.60934f);
     } else if (g_units == UNITS_AVIATION) {
-      tft.printf("%dft  %d%s  %.1fnm", g_lastFlight.altFt,
+      tft.printf("%dft  %d %s  %.1fnm", g_lastFlight.altFt,
                  (int)round(spdDisp(g_lastFlight.spdKt)), spdUnit(),
                  g_lastFlight.distMi * 0.868976f);
     } else {
-      tft.printf("%dft  %d%s  %.1fmi", g_lastFlight.altFt,
+      tft.printf("%dft  %d %s  %.1fmi", g_lastFlight.altFt,
                  (int)round(spdDisp(g_lastFlight.spdKt)), spdUnit(),
                  g_lastFlight.distMi);
     }
