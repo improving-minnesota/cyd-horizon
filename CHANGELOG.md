@@ -1,5 +1,12 @@
 # Changelog
 
+## [3.10.2](https://github.com/improving-minnesota/cyd-horizon/compare/v3.10.1...v3.10.2) (2026-10-16)
+
+
+### Bug Fixes
+
+* document the wind speed tiers in README, Help and user guide ([#181](https://github.com/improving-minnesota/cyd-horizon/issues/181)) ([ab67a7b](https://github.com/improving-minnesota/cyd-horizon/commit/ab67a7b5f8e43b9e08e8439f7ffb0ef1f7505bd8))
+
 ## [3.10.1](https://github.com/improving-minnesota/cyd-horizon/compare/v3.10.0...v3.10.1) (2026-10-16)
 
 
