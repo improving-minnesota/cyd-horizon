@@ -716,9 +716,9 @@ def draw_idle(d):
         # No +11 baseline offset on the arrow: its cy is a centre, not a text top.
         wind_arrow(50, top + 116, 8, wdir, wcol)
         txt(8, top + 137, 11, wcol,
-            f"{wind_dir8(wdir)} {round(wkt * 1.15078)}mph")
+            f"{wind_dir8(wdir)} {round(wkt * 1.15078)} mph")
         txt(8, top + 155, 11, wind_col(gkt or 0, True),
-            f"Gusts {round((gkt or 0) * 1.15078)}mph")
+            f"Gusts {round((gkt or 0) * 1.15078)} mph")
     else:
         txt(8, top + 119, 11, "#c0c0c0", "Wind")
         txt(8, top + 137, 11, "#c0c0c0", "--")
