@@ -355,6 +355,11 @@ const char* unitsName() { return g_units == UNITS_METRIC ? "Metric" : (g_units =
 // Temps stored as F; converted at display so stored history survives unit switches.
 float tempDisp(float f) { return g_units == UNITS_IMPERIAL ? f : (f - 32.0f) * 5.0f / 9.0f; }
 char  tempUnit()        { return g_units == UNITS_IMPERIAL ? 'F' : 'C'; }
+// Speeds are stored as knots (flight tracks in knots, and weather.ino asks
+// Open-Meteo for wind in knots), so one converter serves both. Metric is km/h,
+// imperial mph, aviation knots.
+float       spdDisp(float kt) { return g_units == UNITS_METRIC ? kt * 1.852f : (g_units == UNITS_IMPERIAL ? kt * 1.15078f : kt); }
+const char* spdUnit()         { return g_units == UNITS_METRIC ? "km/h" : (g_units == UNITS_IMPERIAL ? "mph" : "kts"); }
 bool  g_clock24 = false;       // false = 12-hour clock with AM/PM, true = 24-hour
 bool  g_showTimer = false;     // show/update the dashboard countdown bar (Flight Tracker)
 bool  g_showIata = true;       // show IATA airport codes in route display when ADSB.lol has them
@@ -2223,11 +2228,14 @@ void drawFlightInfo(Plane& p) {
   tft.setCursor(8, 94);
   tft.setTextColor(TFT_YELLOW, TFT_BLACK);
   if (g_units == UNITS_METRIC) {
-    tft.printf("%dm  %dkts  %.1fkm", (int)round(p.altFt * 0.3048f), p.spdKt, p.distMi * 1.60934f);
+    tft.printf("%dm  %d%s  %.1fkm", (int)round(p.altFt * 0.3048f),
+               (int)round(spdDisp(p.spdKt)), spdUnit(), p.distMi * 1.60934f);
   } else if (g_units == UNITS_AVIATION) {
-    tft.printf("%dft  %dkts  %.1fnm", p.altFt, p.spdKt, p.distMi * 0.868976f);
+    tft.printf("%dft  %d%s  %.1fnm", p.altFt,
+               (int)round(spdDisp(p.spdKt)), spdUnit(), p.distMi * 0.868976f);
   } else {
-    tft.printf("%dft  %dmph  %.1fmi", p.altFt, (int)round(p.spdKt * 1.15078f), p.distMi);
+    tft.printf("%dft  %d%s  %.1fmi", p.altFt,
+               (int)round(spdDisp(p.spdKt)), spdUnit(), p.distMi);
   }
 
   // Route: adsb.lol planned, OpenSky shown only when different; getRouteDisplay
@@ -2722,14 +2730,17 @@ void drawFlightDetailPage() {
     tft.setCursor(8, 94);
     tft.setTextColor(TFT_YELLOW, TFT_BLACK);
     if (g_units == UNITS_METRIC) {
-      tft.printf("%dm  %dkts  %.1fkm", (int)round(g_lastFlight.altFt * 0.3048f),
-                 g_lastFlight.spdKt, g_lastFlight.distMi * 1.60934f);
+      tft.printf("%dm  %d%s  %.1fkm", (int)round(g_lastFlight.altFt * 0.3048f),
+                 (int)round(spdDisp(g_lastFlight.spdKt)), spdUnit(),
+                 g_lastFlight.distMi * 1.60934f);
     } else if (g_units == UNITS_AVIATION) {
-      tft.printf("%dft  %dkts  %.1fnm", g_lastFlight.altFt,
-                 g_lastFlight.spdKt, g_lastFlight.distMi * 0.868976f);
+      tft.printf("%dft  %d%s  %.1fnm", g_lastFlight.altFt,
+                 (int)round(spdDisp(g_lastFlight.spdKt)), spdUnit(),
+                 g_lastFlight.distMi * 0.868976f);
     } else {
-      tft.printf("%dft  %dmph  %.1fmi", g_lastFlight.altFt,
-                 (int)round(g_lastFlight.spdKt * 1.15078f), g_lastFlight.distMi);
+      tft.printf("%dft  %d%s  %.1fmi", g_lastFlight.altFt,
+                 (int)round(spdDisp(g_lastFlight.spdKt)), spdUnit(),
+                 g_lastFlight.distMi);
     }
 
     // Origin/destination from the snapshot (same rules as drawFlightInfo).
@@ -3082,8 +3093,9 @@ void handleTouch() {
       return;
     }
 
-    // tapping the pool icon (idle, pool enabled) opens the history graph
-    if (!overhead && g_poolEnabled && inRect(x, y, 4, 146, 100, 170)) {
+    // tapping the pool icon (idle, pool enabled) opens the history graph.
+    // Stops at 216 so it can't steal taps from the "N aircraft" recall zone.
+    if (!overhead && g_poolEnabled && inRect(x, y, 4, 200, 100, 216)) {
       g_screen = SCR_POOLGRAPH;
       g_screenIdleUntil = millis() + SCREEN_IDLE_TIMEOUT_MS;
       dirty = true;

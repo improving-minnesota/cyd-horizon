@@ -26,11 +26,12 @@
 - **Startup chime** — a short rising melody + LED sweep plays on power-on
   (stays silent when it wakes from sleep mode). Additionally, a chime plays
   after a firmware update.
-- **Weather** — current temperature, feels-like, humidity, sunrise/sunset, a
-  7-day forecast, and temperature history graphs (Day / Week / Month / Year).
+- **Weather** — current temperature, feels-like, humidity, sunrise/sunset,
+  wind speed/direction with gusts, an 8-day forecast, and temperature history
+  graphs (Day / Week / Month / Year).
 
 <div class="shot"><img src="DEVELOPER-USERGUIDE-idle.png"
-     alt="Idle dashboard: weather, sunrise/sunset, pool temperature, 7-day forecast"></div>
+     alt="Idle dashboard: weather, wind and gusts, sunrise/sunset, pool temperature, 8-day forecast"></div>
 
 <!-- PANEL -->
 
@@ -208,7 +209,7 @@ Defaults shown in parentheses.
   shade or grey — colors the
   header and screen buttons); auto-update (on); Notify Volume (levels 1–10,
   default 10); units (Imperial ft/mph/mi,
-  Metric m/kts/km, or Aviation ft/kts/nm — also sets weather and pool temps
+  Metric m/km/h/km, or Aviation ft/kts/nm — also sets weather and pool temps
   to °F or °C); clock (12-hour with AM/PM, or 24-hour).
 - **Location** — your coordinates (auto-guessed on first boot).
 - **Network** — WiFi network (shows *Scanning* while it searches); DHCP or

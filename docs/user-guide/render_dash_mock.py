@@ -68,6 +68,7 @@ BTN  = "#4040a0"   # btnCol() — theme +25% toward white
 DGR  = "#c80000"   # dangerCol() — destructive buttons
 GLN  = "#bfbfe0"   # graphLineCol() — theme +75% toward white
 GAVG = "#ffffa0"   # graphAvgCol() — theme complement (yellow) +75% to white
+LAV  = "#e6beff"   # TFT_LAVENDER — the pool temperature row
 
 # Fixed clock/date shown in the header of every screenshot — a real flight/
 # weather snapshot, but a stable timestamp for the printed guide.
@@ -286,10 +287,12 @@ def fetch_all(env, monitor_sec):
     try:
         url = ("https://api.open-meteo.com/v1/forecast?latitude=%.5f&longitude=%.5f"
                "&current=temperature_2m,relative_humidity_2m,apparent_temperature,"
-               "weather_code&hourly=temperature_2m&past_days=1&forecast_days=7"
+               "weather_code,wind_speed_10m,wind_direction_10m,wind_gusts_10m"
+               "&hourly=temperature_2m&past_days=1&forecast_days=8"
                "&daily=temperature_2m_max,temperature_2m_min,"
                "precipitation_probability_max,weather_code,sunrise,sunset"
-               "&temperature_unit=fahrenheit&timezone=auto&timeformat=unixtime"
+               "&temperature_unit=fahrenheit&wind_speed_unit=kn"
+               "&timezone=auto&timeformat=unixtime"
                % (lat, lon))
         d["wx"], _ = get_json(url)
         hr = d["wx"].get("hourly", {})
@@ -609,28 +612,40 @@ def draw_flight(d):
     txt(8, 232, 9, "#ccc", f'{len(d["planes"])} aircraft')
 
 
-WMO = {0: "sun", 1: "sun", 2: "ptl", 3: "cld", 45: "cld", 48: "cld",
-       51: "rain", 53: "rain", 55: "rain", 61: "rain", 63: "rain", 65: "rain",
-       71: "snow", 73: "snow", 75: "snow", 80: "rain", 81: "rain", 82: "rain",
-       95: "strm", 96: "strm", 99: "strm"}
-
-
 def wx_icon(x, y, code, day=True):
-    kind = WMO.get(code, "cld")
-    if kind == "sun" and day:
+    """Mirror of drawWeatherIcon(): the same numeric WMO ranges, not a per-code
+    table. A table drifted here - a rain code drew no cloud (the cloud was only
+    emitted for the two "cloudy" kinds) and snow/storm drew nothing at all."""
+    rain  = 51 <= code <= 67 or 80 <= code <= 82
+    snow  = 71 <= code <= 77 or 85 <= code <= 86
+    storm = code >= 95
+    cloud = code >= 1
+
+    if day:
         circle(x + 12, y + 8, 5, "#ff0", 1, fill="#ff0")
         for a in range(0, 360, 45):
             r = math.radians(a)
             line(x + 12 + 6 * math.cos(r), y + 8 + 6 * math.sin(r),
                  x + 12 + 10 * math.cos(r), y + 8 + 10 * math.sin(r), "#ff0", 1.5)
-    if kind in ("ptl", "cld"):
+    else:
+        circle(x + 12, y + 8, 5, "#ccc", 1, fill="#ccc")
+        circle(x + 15, y + 8, 5, "#000", 1, fill="#000")   # crescent cutout
+
+    if cloud:
         circle(x + 8, y + 14, 4, "#777", 1, fill="#777")
         circle(x + 14, y + 11, 5, "#777", 1, fill="#777")
         circle(x + 19, y + 14, 4, "#777", 1, fill="#777")
-    if kind == "rain":
+
+    if rain:
         line(x + 8, y + 19, x + 7, y + 22, "#0ff", 1.5)
         line(x + 14, y + 19, x + 13, y + 22, "#0ff", 1.5)
         line(x + 20, y + 19, x + 19, y + 22, "#0ff", 1.5)
+    elif snow:
+        circle(x + 8, y + 21, 1, "#fff", 1, fill="#fff")
+        circle(x + 14, y + 21, 1, "#fff", 1, fill="#fff")
+        circle(x + 20, y + 21, 1, "#fff", 1, fill="#fff")
+    elif storm:
+        line(x + 12, y + 18, x + 8, y + 22, "#ff0", 1.5)
 
 
 def hm12(v):
@@ -643,7 +658,36 @@ def hm12(v):
         h, m = int(v[:2]), int(v[3:5])
         return f"{h % 12 or 12}:{m:02d}{'A' if h < 12 else 'P'}"
     except Exception:
-        return "--:--"
+        return "--"
+
+
+def wind_dir8(from_deg):
+    return ["N", "NE", "E", "SE", "S", "SW", "W", "NW"][round(from_deg / 45.0) % 8]
+
+
+# Wind tiers in knots, mirroring WIND_*_KT / GUST_*_KT in weather.ino.
+def wind_col(kt, gust=False):
+    yel, org, red = (17.0, 30.0, 40.0) if gust else (13.0, 22.0, 27.0)
+    if kt >= red:
+        return "#ff0000"
+    if kt >= org:
+        return "#fda600"
+    if kt >= yel:
+        return "#ffff00"
+    return "#00ff00"
+
+
+def wind_arrow(cx, cy, r, from_deg, col):
+    """Mirror of drawWindArrow(): shaft + head pointing downwind, spanning 2r."""
+    a = math.radians(from_deg + 180.0)
+    dx, dy = math.sin(a), -math.cos(a)
+    px, py = -dy, dx
+    tipx, tipy = cx + r * dx, cy + r * dy
+    hl, hw = r * 0.8, r * 0.45
+    bx, by = tipx - hl * dx, tipy - hl * dy
+    line(cx - r * dx, cy - r * dy, bx, by, col, 1.2)
+    tri((tipx, tipy), (bx + hw * px, by + hw * py), (bx - hw * px, by - hw * py),
+        col, stroke=None)
 
 
 def draw_idle(d):
@@ -664,17 +708,32 @@ def draw_idle(d):
     ss = (daily.get("sunset") or ["-"])[0]
     txt(8, top + 83, 11, "#ff0", "Sunr " + hm12(sr))
     txt(8, top + 101, 11, "#f80", "Suns " + hm12(ss))
+    wkt, gkt = cur.get("wind_speed_10m"), cur.get("wind_gusts_10m")
+    if wkt is not None:
+        wdir = cur.get("wind_direction_10m") or 0
+        wcol = wind_col(wkt)
+        txt(8, top + 119, 11, wcol, "Wind")
+        # No +11 baseline offset on the arrow: its cy is a centre, not a text top.
+        wind_arrow(50, top + 116, 8, wdir, wcol)
+        txt(8, top + 137, 11, wcol,
+            f"{wind_dir8(wdir)} {round(wkt * 1.15078)}mph")
+        txt(8, top + 155, 11, wind_col(gkt or 0, True),
+            f"Gusts {round((gkt or 0) * 1.15078)}mph")
+    else:
+        txt(8, top + 119, 11, "#c0c0c0", "Wind")
+        txt(8, top + 137, 11, "#c0c0c0", "--")
+        txt(8, top + 155, 11, "#c0c0c0", "Gusts --")
     if d["pool"] is not None:
-        txt(8, top + 119, 11, "#ccc", "Pool ")
-        txt(50, top + 119, 11, "#0f0", f'{d["pool"]:.1f}F')
+        txt(8, top + 173, 11, LAV, "Pool ")
+        txt(50, top + 173, 11, LAV, f'{d["pool"]:.1f}F')
     x0, y0, w, h = 110, top + 2, 46, 92
     days = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"]
     wd = (MOCK_DT.weekday() + 1) % 7  # Mon=0 -> Sun-first
-    hi = daily.get("temperature_2m_max") or [0] * 7
-    lo = daily.get("temperature_2m_min") or [0] * 7
-    rn = daily.get("precipitation_probability_max") or [0] * 7
-    wc = daily.get("weather_code") or [0] * 7
-    for i in range(7):
+    hi = daily.get("temperature_2m_max") or [0] * 8
+    lo = daily.get("temperature_2m_min") or [0] * 8
+    rn = daily.get("precipitation_probability_max") or [0] * 8
+    wc = daily.get("weather_code") or [0] * 8
+    for i in range(8):
         col, row = i % 4, i // 4
         x, y = x0 + col * w, y0 + row * h
         txt(x, y + 8, 9, "#fff", days[(wd + i) % 7])
