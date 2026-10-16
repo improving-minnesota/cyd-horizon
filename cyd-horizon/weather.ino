@@ -2,13 +2,26 @@
 
 #include <time.h>
 
+// Light purple for the pool row. TFT_PURPLE (0x780F) is too dark to read on
+// black; this is rgb(230,190,255) - bright enough to sit alongside the other
+// rows while keeping an unmistakable purple cast.
+#define TFT_LAVENDER 0xE5FF
+
 // Weather state (global across tabs)
 float g_temp = 0.0f, g_humidity = 0.0f, g_feels = 0.0f;
 char  g_sunrise[6] = "--:--", g_sunset[6] = "--:--";
-float g_high[7] = {0}, g_low[7] = {0};
-int   g_rain[7] = {0}, g_wcode[7] = {0};
+// 8 days: the 7-day grid leaves the 4th cell of its second row empty, so day 8
+// fills it (see drawIdle()).
+float g_high[8] = {0}, g_low[8] = {0};
+int   g_rain[8] = {0}, g_wcode[8] = {0};
 int   g_wcode_cur = 0;     // current WMO weather code (for the idle icon)
 bool  g_weatherValid = false;
+// Wind at 10 m, stored in knots (the API is asked for knots) so it shares
+// spdDisp()/spdUnit() with flight speeds. g_windDir is the direction the wind
+// comes FROM (meteorological convention); g_windValid is false until a fetch
+// carries the field, so the idle rows can show "--" instead of 0.
+float g_windKt = 0.0f, g_gustKt = 0.0f, g_windDir = 0.0f;
+bool  g_windValid = false;
 
 extern unsigned long g_lastWeather;
 
@@ -39,10 +52,18 @@ String fmtDate() {
   return String(b);
 }
 
+// True when `hm` holds a real "HH:MM". The unpopulated placeholder is "--:--",
+// which atoi() silently reads as 00:00 - that printed as "12:00A" and left
+// isDayNow() stuck in night.
+static bool isHm(const char* hm) {
+  return hm && hm[0] >= '0' && hm[0] <= '9' && hm[1] >= '0' && hm[1] <= '9' &&
+         hm[3] >= '0' && hm[3] <= '9' && hm[4] >= '0' && hm[4] <= '9';
+}
+
 // "HH:MM" (24h) for display: 12-hour gets a one-letter marker ("7:47A"),
 // 24-hour stays as-is. Used for sunrise/sunset.
 String fmtHm12(const char* hm) {
-  if (!hm || hm[0] == 0 || hm[1] == 0 || hm[3] == 0 || hm[4] == 0) return "--:--";
+  if (!isHm(hm)) return "--";
   int h = atoi(hm);
   int m = atoi(hm + 3);
   char b[8];
@@ -59,6 +80,7 @@ String fmtHm12(const char* hm) {
 bool isDayNow() {
   struct tm t;
   if (!getLocalTime(&t, 0)) return true;
+  if (!isHm(g_sunrise) || !isHm(g_sunset)) return true;   // sun times not in yet
   int now = t.tm_hour * 60 + t.tm_min;
   int sr = atoi(g_sunrise) * 60 + atoi(g_sunrise + 3);
   int ss = atoi(g_sunset)  * 60 + atoi(g_sunset + 3);
@@ -138,12 +160,16 @@ void fetchWeather() {
     return;
   }
 
-  char url[320];
+  // 448: the request is ~382 chars locally but up to 384 with a full-length
+  // westward longitude, so the old 320 buffer no longer fits - snprintf would
+  // silently truncate the URL and the fetch would fail.
+  char url[448];
   snprintf(url, sizeof url,
     "https://api.open-meteo.com/v1/forecast?latitude=%.5f&longitude=%.5f"
-    "&current=temperature_2m,relative_humidity_2m,apparent_temperature,weather_code"
+    "&current=temperature_2m,relative_humidity_2m,apparent_temperature,weather_code,"
+    "wind_speed_10m,wind_direction_10m,wind_gusts_10m"
     "&daily=temperature_2m_max,temperature_2m_min,precipitation_probability_max,weather_code,sunrise,sunset"
-    "&forecast_days=7&temperature_unit=fahrenheit&timezone=auto",
+    "&forecast_days=8&temperature_unit=fahrenheit&wind_speed_unit=kn&timezone=auto",
     g_lat, g_lon);
 
   // open-meteo is Let's Encrypt (ISRG root), same verified bundle as OpenSky.
@@ -178,6 +204,18 @@ void fetchWeather() {
   g_humidity = cur["relative_humidity_2m"] | 0.0f;
   g_feels = cur["apparent_temperature"] | g_temp;   // falls back to actual temp
   g_wcode_cur = cur["weather_code"] | g_wcode_cur;  // keep last known on absence
+  // -1 sentinel: a body without the wind fields (or a partial one) leaves the
+  // rows showing "--" rather than a bogus 0. In the "current" block
+  // wind_speed_10m is an instantaneous value while wind_gusts_10m is the
+  // preceding hour's maximum, so "Gusts" reads as the worst recent gust.
+  g_windKt  = cur["wind_speed_10m"] | -1.0f;
+  g_gustKt  = cur["wind_gusts_10m"] | -1.0f;
+  g_windDir = cur["wind_direction_10m"] | 0.0f;
+  g_windValid = (g_windKt >= 0.0f);
+  if (isDevBuild()) {
+    Serial.printf("[net] wx wind=%.0fkt dir=%.0f gust=%.0fkt valid=%d url=%uch\n",
+                  g_windKt, g_windDir, g_gustKt, (int)g_windValid, (unsigned)strlen(url));
+  }
 
   JsonObject daily = doc["daily"];
   JsonArray hmax = daily["temperature_2m_max"];
@@ -186,7 +224,7 @@ void fetchWeather() {
   JsonArray wc   = daily["weather_code"];
   JsonArray sr   = daily["sunrise"];
   JsonArray ss   = daily["sunset"];
-  for (int i = 0; i < 7; i++) {
+  for (int i = 0; i < 8; i++) {
     g_high[i]   = hmax[i] | 0.0f;
     g_low[i]    = hmin[i] | 0.0f;
     g_rain[i]   = rain[i] | 0;
@@ -258,53 +296,124 @@ void drawWeatherIcon(int x, int y, int code, bool day) {
   }
 }
 
+// ---- Wind display ----
+// Open-Meteo reports the direction the wind comes FROM (the meteorological
+// convention, same as "an NE wind"). The arrow points downwind instead - the
+// direction the air is travelling toward - which is what a glance expects; the
+// letter keeps the "from" reading unambiguous.
+const char* windDir8(float fromDeg) {
+  static const char* d[8] = {"N","NE","E","SE","S","SW","W","NW"};
+  return d[((int)lroundf(fromDeg / 45.0f)) & 7];
+}
+
+// Wind tiers, knots (mph in comments). Red is the NWS Wind Advisory criteria
+// (sustained 31 mph / gusts 46 mph); the lower tiers are backyard-tuned, since
+// an advisory-level warning arrives later than a patio owner wants to know.
+const float WIND_YEL_KT = 13.0f, WIND_ORG_KT = 22.0f, WIND_RED_KT = 27.0f;  // 15 / 25 / 31 mph
+const float GUST_YEL_KT = 17.0f, GUST_ORG_KT = 30.0f, GUST_RED_KT = 40.0f;  // 20 / 35 / 46 mph
+
+uint16_t windCol(float kt, bool gust) {
+  float y = gust ? GUST_YEL_KT : WIND_YEL_KT;
+  float o = gust ? GUST_ORG_KT : WIND_ORG_KT;
+  float r = gust ? GUST_RED_KT : WIND_RED_KT;
+  return kt >= r ? TFT_RED : (kt >= o ? TFT_ORANGE : (kt >= y ? TFT_YELLOW : TFT_GREEN));
+}
+
+// Arrowhead + shaft pointing along the downwind bearing. `r` is the half-length
+// (the arrow spans 2r) and the head is sized from it.
+void drawWindArrow(int cx, int cy, int r, float fromDeg, uint16_t col) {
+  float a = (fromDeg + 180.0f) * DEG_TO_RAD;
+  float dx = sinf(a), dy = -cosf(a);   // screen unit vector (y grows downward)
+  float px = -dy, py = dx;             // perpendicular
+  int tipX  = cx + (int)lroundf(r * dx),        tipY  = cy + (int)lroundf(r * dy);
+  int tailX = cx - (int)lroundf(r * dx),        tailY = cy - (int)lroundf(r * dy);
+  float hl = r * 0.8f, hw = r * 0.45f;          // head length / half-width
+  int baseX = tipX - (int)lroundf(hl * dx),     baseY = tipY - (int)lroundf(hl * dy);
+  tft.drawLine(tailX, tailY, baseX, baseY, col);
+  tft.fillTriangle(tipX, tipY,
+                   baseX + (int)lroundf(hw * px), baseY + (int)lroundf(hw * py),
+                   baseX - (int)lroundf(hw * px), baseY - (int)lroundf(hw * py), col);
+}
+
 // Idle screen shown when no plane is overhead.
 // Draws below the header (y >= 30), leaving the right 20 px for the countdown bar.
 void drawIdle() {
   bool day = isDayNow();
 
   // current conditions (left column). Content starts below the taller header.
+  // Before the first fetch every reading is still 0, which reads as real data
+  // (and the icon would be a default sun), so show "--" until one lands - in
+  // grey, so a placeholder never wears the reading's own color.
   const int top = 42;
-  tft.setTextColor(TFT_WHITE, TFT_BLACK);
+  tft.setTextColor(g_weatherValid ? TFT_WHITE : TFT_LIGHTGREY, TFT_BLACK);
   tft.setTextFont(4);
   tft.setCursor(8, top);
-  tft.printf("%d%c", (int)round(tempDisp(g_temp)), tempUnit());
+  if (g_weatherValid) tft.printf("%d%c", (int)round(tempDisp(g_temp)), tempUnit());
+  else tft.print("--");
   tft.setTextSize(1);
   // Current conditions icon, to the right of the big temperature (not below
-  // the sunset). Refreshed each weather update.
-  drawWeatherIcon(tft.getCursorX() + 6, top + 4, g_wcode_cur, isDayNow());
+  // the sunset). Refreshed each weather update. Held back until the first
+  // fetch: a default "clear" icon would claim data we don't have yet.
+  if (g_weatherValid) drawWeatherIcon(tft.getCursorX() + 6, top + 4, g_wcode_cur, isDayNow());
   // "Feels like" temperature (apparent_temperature), compact label "FL".
   tft.setTextFont(2);
   tft.setTextColor(TFT_LIGHTGREY, TFT_BLACK);
   tft.setCursor(8, top + 30);
-  tft.printf("FL %d%c", (int)round(tempDisp(g_feels)), tempUnit());
-  tft.setTextColor(TFT_CYAN, TFT_BLACK);
+  if (g_weatherValid) tft.printf("FL %d%c", (int)round(tempDisp(g_feels)), tempUnit());
+  else tft.print("FL --");
+  tft.setTextColor(g_weatherValid ? TFT_CYAN : TFT_LIGHTGREY, TFT_BLACK);
   tft.setCursor(8, top + 50);
-  tft.printf("%d%% hum", (int)g_humidity);
+  if (g_weatherValid) tft.printf("%d%% hum", (int)g_humidity);
+  else tft.print("-- hum");
 
-  tft.setTextColor(TFT_YELLOW, TFT_BLACK);
+  tft.setTextColor(g_weatherValid ? TFT_YELLOW : TFT_LIGHTGREY, TFT_BLACK);
   tft.setCursor(8, top + 72);  tft.print("Sunr "); tft.print(fmtHm12(g_sunrise));
-  tft.setTextColor(TFT_ORANGE, TFT_BLACK);
+  tft.setTextColor(g_weatherValid ? TFT_ORANGE : TFT_LIGHTGREY, TFT_BLACK);
   tft.setCursor(8, top + 90); tft.print("Suns "); tft.print(fmtHm12(g_sunset));
 
+  // Wind + gusts. Fixed rows between sunset and Pool so their position doesn't
+  // depend on the pool toggle. The arrow gets its own line, after the "Wind"
+  // label: rotated inside a text row the arrow is either squeezed small or
+  // reaches into the text (a rigid arrow is as wide as it is long once the wind
+  // turns E/W), and labelling that line instead keeps the value rows at full
+  // column width, which a 3-digit gust needs. Each reading takes its own tier
+  // color, so a calm day with strong gusts reads green over yellow.
+  tft.setTextFont(2);
+  uint16_t wcol = g_windValid ? windCol(g_windKt, false) : TFT_LIGHTGREY;
+  tft.setTextColor(wcol, TFT_BLACK);
+  tft.setCursor(8, top + 108); tft.print("Wind");
+  if (g_windValid) drawWindArrow(50, top + 116, 8, g_windDir, wcol);
+  if (g_windValid) {
+    tft.setCursor(8, top + 126);
+    tft.printf("%s %d%s", windDir8(g_windDir), (int)round(spdDisp(g_windKt)), spdUnit());
+    tft.setTextColor(windCol(g_gustKt, true), TFT_BLACK);
+    tft.setCursor(8, top + 144);
+    tft.printf("Gusts %d%s", (int)round(spdDisp(g_gustKt)), spdUnit());
+  } else {
+    tft.setTextColor(TFT_LIGHTGREY, TFT_BLACK);
+    tft.setCursor(8, top + 126); tft.print("--");
+    tft.setCursor(8, top + 144); tft.print("Gusts --");
+  }
+
   // Pool temp (Govee; only when enabled). Tapping opens the pool history
-  // graph; same one-line layout as Sunr/Suns, below the sunset row.
+  // graph; same one-line layout as Sunr/Suns, below the wind rows. Lavender so
+  // it can't be read as one of the wind tiers, and the whole row goes grey when
+  // there is no reading, like every other placeholder.
 #if POOL_FEATURE
   if (g_poolEnabled) {
     tft.setTextFont(2);
-    tft.setTextColor(TFT_LIGHTGREY, TFT_BLACK);
-    tft.setCursor(8, top + 108); tft.print("Pool ");
-    tft.setTextColor(g_poolValid ? TFT_GREEN : TFT_LIGHTGREY, TFT_BLACK);
+    tft.setTextColor(g_poolValid ? TFT_LAVENDER : TFT_LIGHTGREY, TFT_BLACK);
+    tft.setCursor(8, top + 162); tft.print("Pool ");
     if (g_poolValid) tft.printf("%.1f%c", poolDisp(g_poolTemp), tempUnit());
     else tft.print("--");
   }
 #endif
 
-  // 7-day forecast (right/bottom); columns spread into any extra panel
+  // 8-day forecast (right/bottom); columns spread into any extra panel
   // width but stay clear of the countdown-bar strip on the right edge.
   const int x0 = 110, y0 = top + 2, h = 92;
   const int w = (DISP_W - x0 - 16) / 4;   // 48 on the 2.8", 58 on the 4"
-  for (int i = 0; i < 7; i++) {
+  for (int i = 0; i < 8; i++) {
     int col = i % 4;
     int row = i / 4;
     int x = x0 + col * w;
@@ -315,6 +424,16 @@ void drawIdle() {
     tft.setTextColor(TFT_WHITE, TFT_BLACK);
     tft.setCursor(x, y);
     tft.print(wdName(i));
+
+    // No fetch yet: 0/0/0% would read as real data and the icon would be a
+    // default sun, so show "--" and skip this cell's values.
+    if (!g_weatherValid) {
+      tft.setTextFont(FONT_AUX);
+      tft.setTextColor(TFT_LIGHTGREY, TFT_BLACK);
+      tft.setCursor(x, y + 44);
+      tft.print("--");
+      continue;
+    }
 
     // icon
     drawWeatherIcon(x + 4, y + 16, g_wcode[i], i == 0 ? day : true);

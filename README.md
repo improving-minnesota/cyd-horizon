@@ -88,8 +88,9 @@ Once it's set up it runs on your WiFi — no computer needed.
 - **Startup chime** — a short rising chime with an RGB LED
   sweep plays on power-on; waking from deep sleep stays silent. Additionally,
   a chime plays after a firmware update.
-- **Weather** — current temperature, "feels like", humidity, sunrise/sunset, and
-  a 7-day forecast, refreshed every 10 minutes. The current temperature is also
+- **Weather** — current temperature, "feels like", humidity, sunrise/sunset,
+  wind direction and speed with gusts (color-coded green/yellow/orange/red), and
+  an 8-day forecast, refreshed every 10 minutes. The current temperature is also
   saved on the device (always on) and graphed over Day / Week / Month / Year with the
   low, average, and high.
 
@@ -221,7 +222,7 @@ Defaults for a freshly reset device are shown with each setting.
   (levels 1–10, applies to every speaker sound — alarms, the callsign alert, and
   the boot chime; each step plays a test beep at the new level), pick the
   **Units**
-  (**Imperial** ft/mph/mi, **Metric** m/kts/km, or **Aviation** ft/kts/nm —
+  (**Imperial** ft/mph/mi, **Metric** m/km/h/km, or **Aviation** ft/kts/nm —
   also sets weather and pool temps to °F or °C), and choose a **12 or
   24-hour clock** (24-hour hides the AM/PM marker). The picked color also
   themes the

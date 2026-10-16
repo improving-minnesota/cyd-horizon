@@ -61,7 +61,7 @@ worse than none.
 - Say **why**, not **what**; don't restate the line you're commenting.
 - **Organize** with short section/grouping headers that break long functions or
   files into readable blocks (e.g. `// ---- OpenSky fetch + parse ----`,
-  `// network row`, `// 7-day forecast (right/bottom)`).
+  `// network row`, `// 8-day forecast (right/bottom)`).
 - Document **non-obvious constraints**: ordering, concurrency, why a workaround
   exists, what a magic number means, and edge cases you're guarding against.
 - **Prefer clear names** so most code needs no comment at all.
@@ -973,7 +973,7 @@ Settings are stored in NVS under the `"flight"` namespace (see `setup()` in
 | `timer` | bool | `false` | Show the dashboard countdown/timer bar (Flight Tracker → Enable Timer). |
 | `showiata` | bool | `true` | Display route airports as `ICAO | IATA` when ADSB.lol provides an IATA code (Flight Tracker → Show IATA Airports). |
 | `clkcol` | uint32 | `TFT_BLUE` | RGB565 theme color from the General → Clock Color picker — tap-target swatch rows for hue, shade, and greyscale (`hsv565()`/`colorPickEnter()`). Drives the header band and every ordinary button; `btnFg()` picks black text on light colors, white on dark, and `btnCol()` nudges buttons a shade darker on light themes / toward white on dark ones. Header Back buttons are ordinary buttons (`backBtn()`); destructive buttons use `dangerCol()` — red, or yellow when the theme is near-red. History graphs draw on the button color (`graphBgCol()`), the data line is the theme pushed 75% toward white/black (`graphLineCol()`), and the avg line is the theme's complement at the same blend (`graphAvgCol()`). Semantic controls keep their own colors. |
-| `units` | int | `0` | Device units (General → Units): 0 = Imperial (ft/mph/mi), 1 = Metric (m/kts/km), 2 = Aviation (ft/kts/nm). Radius and ceiling are still stored in miles/feet; the selected unit only changes what's displayed and what the sliders edit — switching units keeps the displayed number and reinterprets it in the new unit. Temperatures are fetched/logged in °F and converted at display (`tempDisp()`), so Metric and Aviation show °C. Migrates the old `metric` bool on first boot. |
+| `units` | int | `0` | Device units (General → Units): 0 = Imperial (ft/mph/mi), 1 = Metric (m/km/h/km), 2 = Aviation (ft/kts/nm). Radius and ceiling are still stored in miles/feet; the selected unit only changes what's displayed and what the sliders edit — switching units keeps the displayed number and reinterprets it in the new unit. Temperatures are fetched/logged in °F and converted at display (`tempDisp()`), so Metric and Aviation show °C. Speeds are stored in knots (flight tracks in knots, wind requested in knots) and converted by `spdDisp()`. Migrates the old `metric` bool on first boot. |
 | `clock24` | bool | `false` | 24-hour clock (General → Clock). Affects the header clock, time editors, alarm times, and sunrise/sunset; `false` shows 12-hour times with AM/PM markers. |
 | `homeap` | string | `""` | Home Airport (ICAO). Used for the LED blink: red when origin matches, green when destination matches. Leave empty to disable. |
 | `watchcs` | string | `""` | Watched callsign (Flight Tracker → Watch Callsign (ICAO)) — substring match (`isWatchedCallsign`), case-insensitive: "DAL" matches DAL1234, "5432" matches DAL5432; a lone "*" matches every flight. When a matching plane appears in a poll and its radar blip is inside the screen bounds it is promoted to the tracked flight (closest match wins — `planes[]` is distance-sorted); while shown it alerts with the `watchntf` pattern on the LED + speaker. Leave empty to disable. |
@@ -1036,6 +1036,64 @@ state (`drawAuthBorder` / `drawStatusBorder` in `cyd-horizon.ino`):
 `dashboardCriticalLabel()` and `dashboardWarningLabel()` decide the two cases;
 the clock bar color is `g_clockCol` (persisted `clkcol`) except when a critical
 issue overrides it with maroon.
+
+### Wind (idle screen)
+
+The idle screen shows wind at 10 m from the same Open-Meteo `current` block as
+the temperature: a `Wind` label followed by the arrow on their own line, then
+the direction letter plus sustained speed, then a `Gusts` row. All three sit
+between the sunset and Pool rows, so their position is fixed regardless of the
+Pool Temp toggle — the Pool row moves down to make room and is drawn in
+`TFT_LAVENDER` (`0xE5FF`, defined in `weather.ino`; TFT_PURPLE is too dark to
+read on black), so it can't be read as one of the wind tiers.
+
+- **Units.** The request asks for `wind_speed_unit=kn`, so wind is stored in
+  knots — the same base as flight speeds — and `spdDisp()` / `spdUnit()` in
+  `cyd-horizon.ino` convert it for display (mph / km/h / kts). Metric is km/h
+  for **both** the wind rows and the flight speed readouts.
+- **Direction.** `wind_direction_10m` is the direction the wind comes *from*
+  (the meteorological convention, as in "an NE wind"). The letter prints that
+  direction; the arrow points **downwind** — where the air is travelling toward
+  — via `drawWindArrow()`, which rotates a shaft + filled triangle by
+  `direction + 180`. It gets its own line rather than sharing a text row: a
+  rigid arrow is as wide as it is long once the wind turns E/W, so inside a row
+  it either has to shrink or reach into the text. That line also carries the
+  `Wind` label, which keeps the readings below at the full column width — what
+  makes a 3-digit gust (`Gusts 161km/h`) and a 3-digit sustained speed fit.
+- **Gusts.** In the `current` block `wind_speed_10m` is an instantaneous value
+  while `wind_gusts_10m` is the *preceding hour's maximum*, so the Gusts row
+  reads as the worst recent gust, not an instantaneous one.
+- **Colors.** Each row is colored from its own value (`windCol()`), so a calm
+  day with strong gusts reads green over red. Thresholds are declared in knots
+  (`WIND_*_KT` / `GUST_*_KT`) with the mph equivalents in comments:
+
+| Tier | Sustained | Gusts |
+|---|---|---|
+| Green (normal) | < 13 kt (< 15 mph) | < 17 kt (< 20 mph) |
+| Yellow (gusty) | 13–21 kt (15–24 mph) | 17–29 kt (20–34 mph) |
+| Orange (strong) | 22–26 kt (25–30 mph) | 30–39 kt (35–45 mph) |
+| Red | ≥ 27 kt (≥ 31 mph) | ≥ 40 kt (≥ 46 mph) |
+
+Red is the NWS **Wind Advisory** criteria (sustained 31 mph / gusts 46 mph).
+The lower tiers are backyard-tuned — the advisory thresholds arrive later than
+a patio owner wants to be warned.
+
+Tiers are evaluated on the stored knot value while the display rounds to whole
+units, so a value within ~0.5 kt of a boundary can print a number that looks one
+step off its color (12.9 kt prints `15mph` in green).
+
+Before the first fetch of a boot `g_weatherValid` and `g_windValid` are false,
+so the big temperature, feels-like, humidity, sunrise/sunset, the wind rows and
+every forecast cell print `--` rather than a plausible-looking `0` / `0%`. Every
+placeholder is grey, so one never wears the reading's own color, and both the
+idle conditions icon and the forecast cells' icons are held back — a default
+"clear" icon would otherwise claim data that isn't there. The Pool row has its
+own `g_poolValid` (Govee is a separate source) and likewise drops to grey, label
+included, while its reading is missing. Wind is display-only: it is not logged
+to the history CSV tiers.
+
+The forecast grid is **8 days** (`forecast_days=8`): the 4-wide grid leaves the
+fourth cell of its second row empty at 7, so day 8 fills it.
 
 ## Network screen & WiFi scanning
 
