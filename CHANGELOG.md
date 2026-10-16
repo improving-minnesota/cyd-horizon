@@ -1,5 +1,12 @@
 # Changelog
 
+## [3.10.4](https://github.com/improving-minnesota/cyd-horizon/compare/v3.10.3...v3.10.4) (2026-10-16)
+
+
+### Bug Fixes
+
+* separate the flight speed from its unit ([#185](https://github.com/improving-minnesota/cyd-horizon/issues/185)) ([da10e90](https://github.com/improving-minnesota/cyd-horizon/commit/da10e90794458a445aa629dbdce7bd7761e9889d))
+
 ## [3.10.3](https://github.com/improving-minnesota/cyd-horizon/compare/v3.10.2...v3.10.3) (2026-10-16)
 
 
