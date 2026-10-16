@@ -1,5 +1,12 @@
 # Changelog
 
+## [3.10.3](https://github.com/improving-minnesota/cyd-horizon/compare/v3.10.2...v3.10.3) (2026-10-16)
+
+
+### Bug Fixes
+
+* separate the wind value from its unit on the idle screen ([#183](https://github.com/improving-minnesota/cyd-horizon/issues/183)) ([2f448dc](https://github.com/improving-minnesota/cyd-horizon/commit/2f448dce21a1ff79f95f593a6edfaf69dc1bbd26))
+
 ## [3.10.2](https://github.com/improving-minnesota/cyd-horizon/compare/v3.10.1...v3.10.2) (2026-10-16)
 
 
