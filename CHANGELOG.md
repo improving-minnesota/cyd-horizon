@@ -1,5 +1,12 @@
 # Changelog
 
+## [3.10.1](https://github.com/improving-minnesota/cyd-horizon/compare/v3.10.0...v3.10.1) (2026-10-16)
+
+
+### Bug Fixes
+
+* break history graph line at ring-buffer wrap ([#179](https://github.com/improving-minnesota/cyd-horizon/issues/179)) ([8a6dba4](https://github.com/improving-minnesota/cyd-horizon/commit/8a6dba42ac5a0f0f730896896b9beb51ddef6365))
+
 ## [3.10.0](https://github.com/improving-minnesota/cyd-horizon/compare/v3.9.1...v3.10.0) (2026-10-16)
 
 
