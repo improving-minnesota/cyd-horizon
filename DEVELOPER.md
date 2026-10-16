@@ -1063,16 +1063,16 @@ read on black), so it can't be read as one of the wind tiers.
 - **Gusts.** In the `current` block `wind_speed_10m` is an instantaneous value
   while `wind_gusts_10m` is the *preceding hour's maximum*, so the Gusts row
   reads as the worst recent gust, not an instantaneous one.
-- **Colors.** Each row is colored from its own value (`windCol()`), so a calm
+- **Tiers.** Each row is colored from its own value (`windCol()`), so a calm
   day with strong gusts reads green over red. Thresholds are declared in knots
   (`WIND_*_KT` / `GUST_*_KT`) with the mph equivalents in comments:
 
-| Tier | Sustained | Gusts |
-|---|---|---|
-| Green (normal) | < 13 kt (< 15 mph) | < 17 kt (< 20 mph) |
-| Yellow (gusty) | 13–21 kt (15–24 mph) | 17–29 kt (20–34 mph) |
-| Orange (strong) | 22–26 kt (25–30 mph) | 30–39 kt (35–45 mph) |
-| Red | ≥ 27 kt (≥ 31 mph) | ≥ 40 kt (≥ 46 mph) |
+| Color | Tier | Sustained | Gusts |
+|---|---|---|---|
+| 🟢 Green | calm | < 15 mph (< 13 kt) | < 20 mph (< 17 kt) |
+| 🟡 Yellow | gusty | 15–24 mph (13–21 kt) | 20–34 mph (17–29 kt) |
+| 🟠 Orange | strong | 25–30 mph (22–26 kt) | 35–45 mph (30–39 kt) |
+| 🔴 Red | advisory | ≥ 31 mph (≥ 27 kt) | ≥ 46 mph (≥ 40 kt) |
 
 Red is the NWS **Wind Advisory** criteria (sustained 31 mph / gusts 46 mph).
 The lower tiers are backyard-tuned — the advisory thresholds arrive later than
