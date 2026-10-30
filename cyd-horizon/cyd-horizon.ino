@@ -391,6 +391,23 @@ unsigned long g_lastScanDay = 0; // epoch day of last auto-update scan (0 = neve
 time_t g_autoScanAt = 0;         // epoch the pending daily scan may run (0 = none)
 bool   g_autoScanForced = false; // scan sits at a least-bad slot inside an alarm window
 
+// ---- Advisory wind alert ----
+// Popup when either wind reading reaches the red tier (the NWS Wind Advisory
+// thresholds windCol() colors). Persisted in NVS: windalrt (on), windntf
+// (notify preset), winddis (dismissed-until epoch), windsnz (snoozed-until),
+// windsnc (snoozes used this episode).
+#define WIND_DISMISS_SEC (24UL * 3600UL)   // Dismiss silences advisories for a day
+#define WIND_SNOOZE_SEC  (6UL * 3600UL)    // Snooze re-arms in six hours
+#define WIND_MAX_SNOOZES 3                 // past the cap, Snooze dismisses for the day
+bool     g_windAlertOn = true;
+int      g_windNotify = 0;                 // preset index; "Breeze" resolved at boot
+uint32_t g_windDismissedUntil = 0;
+uint32_t g_windSnoozeUntil = 0;
+int      g_windSnoozes = 0;
+bool     g_windFiring = false;             // popup is up (LED + speaker running)
+volatile bool g_windAlertPending = false;  // advisory seen, popup not raised yet
+float    g_windAlertKt = 0.0f, g_windAlertGustKt = 0.0f;   // snapshot for the popup
+
 // OTA / firmware update state
 int    g_updateState = 0;      // 0 idle, 1 checking, 2 available, 3 none, 4 error
 String g_updateLatest;         // latest version label when an update is available
@@ -413,6 +430,7 @@ bool   g_upgraded = false;     // this boot runs a different version than last b
 int    g_autoUpdStatus = 0;       // 0 none, 1 scanning, 2 no updates, 3 updating, 4 check failed
 unsigned long g_autoUpdStatusUntil = 0; // millis() deadline to keep showing the transient status
 int   g_ftPage = 0;            // Flight Tracker settings page (0-2)
+int   g_genPage = 0;           // General settings page (0-1)
 float g_lat = 0.0f;           // location; loaded from NVS, or guessed from IP on first boot
 float g_lon = 0.0f;
 int   g_creditsRemaining = 0; // OpenSky X-Rate-Limit-Remaining
@@ -584,7 +602,7 @@ String g_latLonStr = "";   // "lat,lon" edit buffer for the Location page
 String g_sleepStartStr = "2200";  // HHMM for editing in settings
 String g_sleepEndStr   = "0800";
 
-enum Screen { SCR_DASH, SCR_SETTINGS, SCR_GENERAL, SCR_ABOUT, SCR_HELP, SCR_WIFI, SCR_RESET, SCR_SLEEP, SCR_FTRACKER, SCR_POOL, SCR_POOLGRAPH, SCR_WXGRAPH, SCR_LOCATION, SCR_CALIB, SCR_FLIGHTDETAIL, SCR_CREDITS, SCR_ALARMS, SCR_ALARMFIRE, SCR_COLORPICK };
+enum Screen { SCR_DASH, SCR_SETTINGS, SCR_GENERAL, SCR_ABOUT, SCR_HELP, SCR_WIFI, SCR_RESET, SCR_SLEEP, SCR_FTRACKER, SCR_POOL, SCR_POOLGRAPH, SCR_WXGRAPH, SCR_WINDTIERS, SCR_WINDFIRE, SCR_LOCATION, SCR_CALIB, SCR_FLIGHTDETAIL, SCR_CREDITS, SCR_ALARMS, SCR_ALARMFIRE, SCR_COLORPICK };
 Screen g_screen = SCR_DASH;
 Screen g_creditsReturn = SCR_DASH;   // screen to return to from the OpenSky Credits page
 int g_helpScroll = 0;   // Help page vertical scroll offset (px)
@@ -1178,6 +1196,12 @@ bool openskyEnsureToken() {
 volatile bool netWantFlights      = false;
 volatile bool netWantWeather      = false;
 volatile bool netWantLocation     = false;
+volatile bool netWantGeocode      = false;   // address search (Nominatim) - TLS, so not on loopTask
+volatile bool g_locDone           = false;   // net task finished a Find-by-IP fetch
+bool          g_locPending        = false;   // Find-by-IP tapped, result not applied yet
+unsigned long g_locStart          = 0;       // when that request was queued
+volatile int  g_geoState          = 0;       // address search: 0 idle, 1 pending, 2 ok, 3 failed
+unsigned long g_geoStart          = 0;       // when that search was queued
 volatile bool netWantPool         = false;   // refresh the current pool temp
 volatile bool netWantPoolDevices  = false;   // list Govee thermometers
 volatile bool netWantUpdateCheck  = false;   // query GitHub for the latest release
@@ -1194,12 +1218,57 @@ void netTask(void* p) {
     // User-initiated update check gets priority so the About page responds
     // quickly even while background fetches (flights/weather/pool) are queued.
     if (netWantUpdateCheck) { netWantUpdateCheck=false; netBusy=true; checkForUpdate(); netBusy=false; netUpdated=true; }
-    else if (netWantLocation) { netWantLocation = false;   netBusy = true; fetchIpLocation();    netBusy = false; netUpdated = true; }
+    else if (netWantGeocode)  { netWantGeocode  = false;   netBusy = true; g_geoState = geocodeAddress() ? 2 : 3; netBusy = false; netUpdated = true; }
+    else if (netWantLocation) { netWantLocation = false;   netBusy = true; fetchIpLocation();    netBusy = false; g_locDone = true; netUpdated = true; }
     else if (netWantFlights)  { netWantFlights  = false;   netBusy = true; fetchFlights();       netBusy = false; netUpdated = true; g_lastData = millis(); }
     else if (netWantWeather)  { netWantWeather  = false;   netBusy = true; fetchWeather();       netBusy = false; netUpdated = true; }
     else if (netWantPoolDevices){ netWantPoolDevices = false; netBusy = true; fetchGoveeDevices(); netBusy = false; netUpdated = true; }
     else if (netWantPool)    { netWantPool = false;       netBusy = true; fetchGoveeTemp();     netBusy = false; netUpdated = true; }
     else if (netWantAutoScan)   { netWantAutoScan=false;   netBusy=true; autoScanOnce();     netBusy=false; netUpdated=true; }
+  }
+}
+
+// loop() poll for the two location fetches. Both do TLS, so the net task runs
+// them; this applies the result and moves the UI on.
+void pollLocationFetches() {
+  // No WiFi means the net task never picks these up - time out rather than
+  // leaving the UI stuck on a "pending" state.
+  if (g_locPending && !g_locDone && millis() - g_locStart > 15000) {
+    g_locPending = false;
+    snprintf(lastErr, sizeof lastErr, "geo 0");
+    dirty = true;
+  }
+  if (g_locPending && g_locDone) {
+    g_locDone = false;
+    g_locPending = false;
+    saveFloat("lat", g_lat);
+    saveFloat("lon", g_lon);
+    if (isDevBuild()) Serial.printf("[loc] find-by-ip lat=%.5f lon=%.5f\n", g_lat, g_lon);
+    dirty = true;
+  }
+  if (g_geoState == 1 && millis() - g_geoStart > 20000) {
+    snprintf(lastErr, sizeof lastErr, "geo 0");
+    g_geoState = 3;
+  }
+  if (g_geoState >= 2) {
+    int st = g_geoState;
+    g_geoState = 0;
+    if (isDevBuild()) {
+      Serial.printf("[geo] %s lat=%.5f lon=%.5f place=%s err=%s\n",
+                    st == 2 ? "ok" : "fail", g_lat, g_lon, g_lastPlace.c_str(), lastErr);
+    }
+    // Only advance the UI if the search screen is still up - a Back press
+    // meanwhile must not yank the user back into the flow.
+    if (g_screen == SCR_WIFI && g_wifiSub == 14) {
+      if (st == 2) {
+        g_addrErr = "";
+        g_screen = SCR_LOCATION;
+      } else {
+        g_addrErr = (String(lastErr) == "no match") ? "no-match" : friendlyGeoError(lastErr);
+        g_wifiSub = 12;   // status page; "Fix Address" returns to the editor
+      }
+      dirty = true;
+    }
   }
 }
 
@@ -2952,6 +3021,10 @@ void handleTouch() {
 
   if (g_screen == SCR_WXGRAPH) { handleWxGraphTouch(x, y); return; }
 
+  if (g_screen == SCR_WINDTIERS) { handleWindTiersTouch(x, y); return; }
+
+  if (g_screen == SCR_WINDFIRE) { handleWindAlertTouch(x, y); return; }
+
   if (g_screen == SCR_COLORPICK) { handleColorPickTouch(x, y); return; }
   if (g_screen == SCR_ALARMS) { handleAlarmsTouch(x, y); return; }
 
@@ -3045,7 +3118,7 @@ void handleTouch() {
     if (idx == 0) { g_screen = SCR_ABOUT; dirty = true; g_updateState = 1; netWantUpdateCheck = true; return; }  // About
     if (idx == 1) { calBegin(); return; }                                // Calibrate Touch
     if (idx == 2) { g_ftPage = 0; g_screen = SCR_FTRACKER; dirty = true; return; }   // Flight Tracker
-    if (idx == 3) { g_screen = SCR_GENERAL; dirty = true; return; }      // General
+    if (idx == 3) { g_genPage = 0; g_screen = SCR_GENERAL; dirty = true; return; }      // General
     if (idx == 4) { g_screen = SCR_HELP; g_helpScroll = 0; dirty = true; return; }  // Help
     if (idx == 5) { g_screen = SCR_LOCATION; dirty = true; return; }     // Location
     if (idx == 6) { enterWifiScreen(); return; }                         // Network
@@ -3075,10 +3148,19 @@ void handleTouch() {
       return;
     }
     if (inRect(x, y, 10, 140, DISP_W - 10, 174)) {  // Find by IP
-      fetchIpLocation();
-      saveFloat("lat", g_lat);
-      saveFloat("lon", g_lon);
-      dirty = true;
+      // TLS can't run on loopTask (8 KB stack): the net task does the fetch and
+      // pollLocationFetches() applies it.
+      if (!g_locPending) {
+        if (WiFi.status() != WL_CONNECTED) {
+          snprintf(lastErr, sizeof lastErr, "geo 0");   // no link: nothing to fetch
+        } else {
+          g_locDone = false;
+          g_locPending = true;
+          g_locStart = millis();
+          netWantLocation = true;
+        }
+        dirty = true;
+      }
       return;
     }
     return;
@@ -3142,6 +3224,15 @@ void handleTouch() {
       dirty = true;
       return;
     }
+
+    // Wind/Gusts rows (idle) open the tier table. Zone ends above the Pool row
+    // (204) and the "N aircraft" line so neither loses its tap.
+    if (!overhead && inRect(x, y, 4, 148, 120, 196)) {
+      g_screen = SCR_WINDTIERS;
+      g_screenIdleUntil = millis() + SCREEN_IDLE_TIMEOUT_MS;
+      dirty = true;
+      return;
+    }
   }
 
   if (g_screen == SCR_FLIGHTDETAIL) {
@@ -3155,9 +3246,55 @@ void handleTouch() {
   }
 }
 
+// Why this boot happened. An unattended reboot leaves no other trace, and the
+// reason is what separates a crash (panic) from a supply sag (brownout) and a
+// scheduled sleep wake (deepsleep).
+static const char* resetReasonName(esp_reset_reason_t r) {
+  switch (r) {
+    case ESP_RST_POWERON:   return "poweron";
+    case ESP_RST_EXT:       return "external";
+    case ESP_RST_SW:        return "software";
+    case ESP_RST_PANIC:     return "panic";
+    case ESP_RST_INT_WDT:   return "int-wdt";
+    case ESP_RST_TASK_WDT:  return "task-wdt";
+    case ESP_RST_WDT:       return "wdt";
+    case ESP_RST_DEEPSLEEP: return "deepsleep";
+    case ESP_RST_BROWNOUT:  return "brownout";
+    case ESP_RST_SDIO:      return "sdio";
+    default:                return "unknown";
+  }
+}
+
+// ---- Sleep-wake worker ----
+// sleeperRun() does TLS (Govee + weather), which overflows loopTask's 8 KB
+// stack - the reason every other fetch runs on a 12 KB task. Run it on one of
+// its own and block setup() until it returns; normally it ends in deep sleep.
+static volatile bool s_sleepWakeDone = false;
+static volatile bool s_sleepWakeResult = false;
+static void sleepWakeTask(void*) {
+  s_sleepWakeResult = sleeperRun();
+  if (isDevBuild()) {
+    Serial.printf("[sleep] wake task peak stack=%uB of %d\n",
+                  (unsigned)(NET_TASK_STACK_BYTES -
+                             uxTaskGetStackHighWaterMark(NULL) * sizeof(StackType_t)),
+                  NET_TASK_STACK_BYTES);
+  }
+  s_sleepWakeDone = true;
+  vTaskDelete(nullptr);
+}
+static bool runSleepWake() {
+  if (xTaskCreate(sleepWakeTask, "sleepwake", NET_TASK_STACK_BYTES, NULL, 1, NULL) != pdPASS) {
+    if (isDevBuild()) Serial.println("[sleep] wake task create failed - booting normally");
+    return false;
+  }
+  while (!s_sleepWakeDone) delay(50);
+  return s_sleepWakeResult;
+}
+
 // ---- Program setup ----
 void setup() {
   Serial.begin(115200);
+  Serial.printf("[boot] reset=%s\n", resetReasonName(esp_reset_reason()));
   // Install the TLS arena before anything can use mbedTLS (hook is
   // process-global). multi_heap is lockless by default; a spinlock keeps it
   // safe if TLS is ever driven from two tasks.
@@ -3240,6 +3377,18 @@ void setup() {
   g_showIata = prefs.getBool("showiata", true);
   g_autoUpdate = prefs.getBool("autoupd", true);
   g_lastScanDay = prefs.getULong("lastscan", 0);
+  // Advisory wind alert: on by default, "Breeze" by name (preset indices shift
+  // when new sounds are appended), plus the dismiss/snooze windows.
+  g_windAlertOn = prefs.getBool("windalrt", true);
+  g_windDismissedUntil = prefs.getULong("winddis", 0);
+  g_windSnoozeUntil = prefs.getULong("windsnz", 0);
+  g_windSnoozes = (int)prefs.getInt("windsnc", 0);
+  {
+    int windNtfDef = 0;
+    for (int i = 0; i < alarmPresetCount(); i++)
+      if (strcmp(alarmPresetName(i), "Breeze") == 0) { windNtfDef = i; break; }
+    g_windNotify = constrain((int)prefs.getInt("windntf", windNtfDef), 0, alarmPresetCount() - 1);
+  }
   // Dev builds never auto-update: force off for this boot, but don't persist -
   // the user's preference must survive into the next release build.
   if (isDevBuild() && g_autoUpdate) {
@@ -3313,7 +3462,7 @@ void setup() {
   // returns when the window ends or WiFi/time fails - then boot normally.
   bool alreadyAwake = false;
   if (g_sleepOn && wakeCause == ESP_SLEEP_WAKEUP_TIMER) {
-    alreadyAwake = sleeperRun();
+    alreadyAwake = runSleepWake();
   }
   // A firing missed while asleep needs no special handling: the alarm's
   // nextFire is a past epoch now, so the first loop() checkAlarms() fires it.
@@ -3404,6 +3553,12 @@ void enterDeepSleep() {
   esp_sleep_enable_timer_wakeup(wakeUs);
   saveRollupState();     // keep the in-progress pool hour/day rollups across this deep sleep
   saveWxRollupState();   // keep the in-progress weather hour/day rollups across this deep sleep
+  // Smallest stack margin this task ever had - the sleep-wake logger's TLS is
+  // the reason it runs on its own 12 KB task, so watch this number.
+  if (isDevBuild()) {
+    Serial.printf("[sleep] stack headroom=%uB\n",
+                  (unsigned)(uxTaskGetStackHighWaterMark(NULL) * sizeof(StackType_t)));
+  }
   esp_deep_sleep_start();
 }
 
@@ -3485,6 +3640,9 @@ bool sleeperRun() {
       fetchGoveeTemp();                      // logs to flash via poolLog
     }
     fetchWeather();                          // logs weather temp to flash via weatherLog
+    // A wind advisory has to wake the device: boot normally so the popup can
+    // be raised (the deep-sleep timer can't display anything).
+    if (g_windAlertPending) return true;
     enterDeepSleep();                        // resets on next wake
   }
 }
@@ -3575,7 +3733,8 @@ void loop() {
     // expire a user-triggered wake once the duration has elapsed
     if (wakeUntil != 0 && (long)(now - wakeUntil) >= 0) wakeUntil = 0;
     asleep = !g_otaActive && !g_otaRunning
-             && inSleepWindowNow() && (wakeUntil == 0);
+             && inSleepWindowNow() && (wakeUntil == 0)
+             && !g_windAlertPending && !g_windFiring;   // a wind advisory keeps it awake
   }
 
   if (asleep) {
@@ -3606,6 +3765,8 @@ void loop() {
   handleTouch();
   calPoll();   // drive the touch-calibration state machine (no-op unless active)
   pollWifiScan();   // harvests/finishes an in-flight async WiFi scan
+  pollLocationFetches();   // applies Find-by-IP / address-search results
+  windAlertPoll();  // raises the advisory-wind popup when a fetch flagged one
 
   // --- WiFi availability / non-blocking reconnect ---
   bool wifiUp = (WiFi.status() == WL_CONNECTED);
@@ -3788,6 +3949,10 @@ void loop() {
       // next timeout into a dismiss for the day.
       if (g_screenIdleUntil == 0) g_screenIdleUntil = now + SCREEN_IDLE_TIMEOUT_MS;
       if (g_screenIdleUntil != 0 && (long)(now - g_screenIdleUntil) >= 0) alarmSnooze();
+    } else if (g_screen == SCR_WINDFIRE) {
+      // Same deal for an unanswered advisory popup (WIND_MAX_SNOOZES cap).
+      if (g_screenIdleUntil == 0) g_screenIdleUntil = now + SCREEN_IDLE_TIMEOUT_MS;
+      if (g_screenIdleUntil != 0 && (long)(now - g_screenIdleUntil) >= 0) windAlertSnooze();
     } else if (g_screen != SCR_DASH) {
       if (g_screenIdleUntil == 0) g_screenIdleUntil = now + SCREEN_IDLE_TIMEOUT_MS;
       if (g_screenIdleUntil != 0 && (long)(now - g_screenIdleUntil) >= 0) {
@@ -3796,6 +3961,7 @@ void loop() {
         g_resetConfirm = 0;
         g_alarmDelConfirm = false;
         g_ftPage = 0;
+        g_genPage = 0;
         g_addrSearch = "";
         g_wifiSub = 0;
         g_otaFromAbout = false;
@@ -3825,6 +3991,8 @@ void loop() {
     else if (g_screen == SCR_POOL) drawPool();
     else if (g_screen == SCR_POOLGRAPH) drawPoolGraph();
     else if (g_screen == SCR_WXGRAPH) drawWxGraph();
+    else if (g_screen == SCR_WINDTIERS) drawWindTiers();
+    else if (g_screen == SCR_WINDFIRE) drawWindAlert();
     else if (g_screen == SCR_FLIGHTDETAIL) drawFlightDetailPage();
     else if (g_screen == SCR_CREDITS) drawCredits();
     else if (g_screen == SCR_ALARMS) drawAlarms();

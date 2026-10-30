@@ -11,24 +11,18 @@
 
 - **Alarms** — up to 6 weekday-scheduled alarms with an LED + sound alert.
 - **Clock & date** — always on top.
-- **Firmware updates** — checks for new firmware once a day and installs it
-  over WiFi, or update manually.
-- **Flight recall** — tap the aircraft count to show the last overhead
-  flight's details.
-- **Flights overhead** *(optional — on by default)* — a mini radar of live
-  aircraft near you: callsign, route, altitude, speed, distance, airline logo,
-  and the plane's actual ground track.
-- **Pool temperature** *(optional — off by default)* — current water
-  temperature and history graphs, if you have a Govee pool thermometer.
-- **Settings** — every option on the device is configurable on-screen:
-  units, clock, WiFi, location, flight tracking, alarms, and more.
-- **Sleep mode** — the screen sleeps overnight and wakes on touch.
-- **Startup chime** — a short rising melody + LED sweep plays on power-on
-  (stays silent when it wakes from sleep mode). Additionally, a chime plays
-  after a firmware update.
-- **Weather** — current temperature, feels-like, humidity, sunrise/sunset,
-  wind speed/direction with gusts, an 8-day forecast, and temperature history
-  graphs (Day / Week / Month / Year).
+- **Firmware updates** — checks daily over WiFi, or update manually.
+- **Flight recall** — tap the aircraft count for the last flight's details.
+- **Flights overhead** *(optional — on)* — a mini radar of live aircraft:
+  callsign, route, altitude, speed, distance, airline logo, ground track.
+- **Pool temperature** *(optional — off)* — current water temperature and
+  history graphs, with a Govee pool thermometer.
+- **Settings** — every option is configurable on-screen.
+- **Sleep mode** — sleeps overnight, wakes on touch.
+- **Startup chime** — rising melody + LED sweep on power-on (silent when
+  waking from sleep); also plays after a firmware update.
+- **Weather** — temperature, feels-like, humidity, sunrise/sunset, wind with
+  gusts, an 8-day forecast, and temperature history graphs.
 
 <div class="shot"><img src="DEVELOPER-USERGUIDE-idle.png"
      alt="Idle dashboard: weather, wind and gusts, sunrise/sunset, pool temperature, 8-day forecast"></div>
@@ -41,6 +35,10 @@
 | <span class="wc wc-y">Yellow</span> | gusty | 15–24 mph | 20–34 mph |
 | <span class="wc wc-o">Orange</span> | strong | 25–30 mph | 35–45 mph |
 | <span class="wc wc-r">Red</span> | advisory | 31+ mph | 46+ mph |
+
+Red raises a **Wind Advisory** popup — waking from sleep if needed. **Dismiss**
+silences it for 24 h; **Snooze** re-arms in 6 h, up to 3×. Tap the wind rows on
+the dashboard for this table and wind alert settings.
 
 <!-- PANEL -->
 
@@ -73,7 +71,9 @@ from a development computer.
 - **A flight's route or track looks wrong** — route and ground-track data
   come from public flight-data feeds that may not have the
   latest data, so they can be missing, outdated, or inaccurate.
-- **New WiFi network** — re-enter it under **Settings → Network**.
+- **Can't connect to WiFi / network not listed** — the device supports
+  **2.4 GHz WiFi only** (not 5 GHz), and a scan takes a few seconds to list
+  networks — longer the first time after boot.
 
 <div class="shot"><img src="DEVELOPER-USERGUIDE-ftracker.png"
      alt="Flight Tracker settings: enable toggle, radius, ceiling, poll interval"></div>
@@ -119,7 +119,8 @@ Yellow Display (CYD)</strong> boards:</p>
    asks you to tap a few crosshairs to calibrate the touchscreen — this is
    skipped if calibration is already saved.
 2. **Enter WiFi.** Type your network name and password with the on-screen
-   keyboard. (Change it later under **Settings → Network**.)
+   keyboard. The device supports **2.4 GHz WiFi only** — 5 GHz networks won't
+   work. (Change it later under **Settings → Network**.)
 3. Done — the dashboard appears and starts loading weather and flights.
 
 ## 📍 Set Your Location
@@ -207,22 +208,18 @@ Defaults shown in parentheses.
 
 - **About** — version, author, and firmware update status / install.
 - **Calibrate Touch** — rerun touch calibration.
-- **Flight Tracker** — enabled (on); radar radius (3.5, in mi/km/nm — how far
-  away to look); altitude ceiling (15,000, in ft/m — planes above it are
-  ignored); poll interval (30 s); timer bar (off); home
-  airport (none); watch callsign — (none, matches
-  any part of a callsign; \* matches every flight);
-  callsign notify (Radar); LED blink (on); Show IATA Airports (on);
-  OpenSky credentials.
-- **General** — theme color picked from swatch rows (tap a hue, then a
-  shade or grey — colors the
-  header and screen buttons); auto-update (on); Notify Volume (levels 1–10,
-  default 10); units (Imperial ft/mph/mi,
-  Metric m/km/h/km, or Aviation ft/kts/nm — also sets weather and pool temps
-  to °F or °C); clock (12-hour with AM/PM, or 24-hour).
+- **Flight Tracker** — enabled (on); radius (3.5 mi/km/nm); ceiling (15,000
+  ft/m); poll interval (30 s); timer bar (off); home airport (none); watch
+  callsign (none; matches any part of a callsign, \* = every flight) and its
+  notify pattern (Radar); LED blink (on); Show IATA (on); OpenSky credentials.
+- **General** — theme color (tap a swatch); auto-update (on); Notify Volume
+  (1–10, default 10); units (Imperial/Metric/Aviation — also °F or °C); clock
+  (12 or 24-hour). Page 2 holds **Wind Alert** (on) and its **Wind Notify**
+  sound (Breeze); both are also on the wind tiers page.
 - **Location** — your coordinates (auto-guessed on first boot).
-- **Network** — WiFi network (shows *Scanning* while it searches); DHCP or
-  static IP; device hostname.
+- **Network** — WiFi network (it shows *Scanning* while it searches — a few
+  seconds, and longer the first time after boot); DHCP or static IP; device
+  hostname.
 - **Pool Temp** — (off) enable, enter the API key, pick your thermometer.
   While off, no data is collected.
 - **Reset** — see the back cover.
@@ -232,17 +229,13 @@ Defaults shown in parentheses.
 ## 💡 LED & Border Colors
 
 - **Red border / LED** — something needs attention: no WiFi, bad OpenSky
-  credentials, exhausted OpenSky credits, or missing weather/pool data.
+  credentials, exhausted credits, or missing weather/pool data.
 - **Yellow** — OpenSky is running anonymously; flights still work.
-- **Flight blinks** — blue for any overhead flight; red when it's departing
-  your home airport; green when arriving; yellow when both ends are your home
-  airport. A watched callsign instead plays its **Callsign Notify**
-  pattern on the LED and speaker
-  while its details are shown — independent of the blink setting.
+- **Flight blinks** — blue for any overhead flight; red departing, green
+  arriving, yellow both ends at your home airport. A watched callsign plays
+  its **Callsign Notify** pattern instead, regardless of the blink setting.
 
 ## 📦 Firmware Updates
 
-The device keeps its firmware current over WiFi. **Auto-Update** (on by
-default) checks once a day and installs new releases; to update
-manually, open **Settings → About** and tap **Install** if a newer
-version is offered. If an update fails, it rolls back automatically.
+**Auto-Update** (on) checks once a day over WiFi and installs new releases;
+**Settings → About → Install** updates manually. A failed update rolls back.

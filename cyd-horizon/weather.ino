@@ -251,6 +251,7 @@ void fetchWeather() {
 
   // record in the RAM ring buffer and (if available) persistent flash log
   weatherLog(g_temp, (unsigned long)time(nullptr));
+  windAlertCheck();   // red-tier wind raises the advisory popup
 }
 
 // Simple 24x24 weather icon; day=true for sun, false for moon.
@@ -624,4 +625,234 @@ void handleWxGraphTouch(uint16_t x, uint16_t y) {
     bx += 76 + (DISP_W - 320) / 4;
   }
   dirty = true;
+}
+
+// ---- Wind tier table ----
+// Opened by tapping the Wind/Gusts rows on the idle screen. The bands are the
+// ones windCol() colors with, rendered in the selected speed unit so the
+// numbers match the dashboard; a closed band's top is one below the next
+// threshold (the thresholds themselves belong to the higher tier).
+static void fmtWindBand(char* out, size_t n, float loKt, float hiKt) {
+  if (loKt < 0)       snprintf(out, n, "<%d", (int)round(spdDisp(hiKt)));
+  else if (hiKt < 0)  snprintf(out, n, "%d+", (int)round(spdDisp(loKt)));
+  else                snprintf(out, n, "%d-%d",
+                               (int)round(spdDisp(loKt)), (int)round(spdDisp(hiKt)) - 1);
+}
+
+void drawWindTiers() {
+  tft.fillScreen(TFT_BLACK);
+  tft.fillRect(0, 0, DISP_W, 28, g_clockCol);
+  tft.setTextColor(btnFg(g_clockCol), g_clockCol);
+  tft.setTextFont(2);
+  tft.setCursor(8, 6);
+  tft.printf("Wind Tiers (%s)", spdUnit());   // unit in the title, not a row
+  backBtn("Back");
+
+  tft.setTextColor(TFT_LIGHTGREY, TFT_BLACK);
+  tft.setTextFont(FONT_AUX);
+  tft.setCursor(36, 36);  tft.print("Tier");
+  tft.setCursor(120, 36); tft.print("Steady");
+  tft.setCursor(220, 36); tft.print("Gusts");
+
+  struct Band { const char* name; uint16_t col; float lo, hi, glo, ghi; };
+  static const Band kBands[] = {
+    { "calm",     TFT_GREEN,  -1,            WIND_YEL_KT, -1,            GUST_YEL_KT },
+    { "gusty",    TFT_YELLOW, WIND_YEL_KT,   WIND_ORG_KT, GUST_YEL_KT,   GUST_ORG_KT },
+    { "strong",   TFT_ORANGE, WIND_ORG_KT,   WIND_RED_KT, GUST_ORG_KT,   GUST_RED_KT },
+    { "advisory", TFT_RED,    WIND_RED_KT,   -1,          GUST_RED_KT,   -1 },
+  };
+  int y = 50;
+  for (const Band& b : kBands) {
+    tft.fillRoundRect(10, y + 3, 18, 18, 4, b.col);
+    tft.setTextFont(2);
+    tft.setTextColor(b.col, TFT_BLACK);
+    tft.setCursor(36, y + 4);
+    tft.print(b.name);
+    tft.setTextColor(TFT_WHITE, TFT_BLACK);
+    char buf[16];
+    fmtWindBand(buf, sizeof buf, b.lo, b.hi);
+    tft.setCursor(120, y + 4); tft.print(buf);
+    fmtWindBand(buf, sizeof buf, b.glo, b.ghi);
+    tft.setCursor(220, y + 4); tft.print(buf);
+    y += 27;
+  }
+
+  drawWindAlertControls(168, 200);
+}
+
+void handleWindTiersTouch(uint16_t x, uint16_t y) {
+  // any touch keeps the screen alive for another 2 minutes
+  g_screenIdleUntil = millis() + SCREEN_IDLE_TIMEOUT_MS;
+  if (inRect(x, y, RX(265), 4, RX(315), 24)) { g_screen = SCR_DASH; dirty = true; return; }  // close
+  if (handleWindAlertControlsTouch(x, y, 168, 200)) return;
+  dirty = true;
+}
+
+// ---- advisory wind alert ----
+// True when either reading is in the red tier (the NWS Wind Advisory levels
+// windCol() colors red).
+bool windAdvisoryActive() {
+  return g_windValid && (g_windKt >= WIND_RED_KT || g_gustKt >= GUST_RED_KT);
+}
+
+// Net-task side (after every weather fetch): only raise the flag - loop() owns
+// the display. Dismiss/snooze windows suppress it, as does the setting.
+void windAlertCheck() {
+  if (!g_windAlertOn || !windAdvisoryActive()) return;
+  time_t now = time(nullptr);
+  if (now < 1600000000L) return;
+  if (g_windDismissedUntil && (uint32_t)now < g_windDismissedUntil) return;
+  if (g_windSnoozeUntil && (uint32_t)now < g_windSnoozeUntil) return;
+  g_windAlertKt = g_windKt;
+  g_windAlertGustKt = g_gustKt;
+  g_windAlertPending = true;
+}
+
+// loop() side: put the popup up. Never stomps on an alarm, OTA, calibration or
+// the setup wizard - the flag simply waits.
+void windAlertPoll() {
+  // Advisory over: the next one gets a fresh snooze budget.
+  if (!windAdvisoryActive() && g_windSnoozes) {
+    g_windSnoozes = 0;
+    prefs.begin("flight", false); prefs.putInt("windsnc", 0); prefs.end();
+  }
+  if (!g_windAlertPending || g_windFiring) return;
+  if (g_alarmFiring || g_otaActive || g_otaRunning || g_calState != CAL_NONE
+      || g_bootStage != BOOT_DONE) return;
+  g_windAlertPending = false;
+  g_windFiring = true;
+  g_screen = SCR_WINDFIRE;
+  g_screenIdleUntil = millis() + SCREEN_IDLE_TIMEOUT_MS;
+  dirty = true;
+  if (isDevBuild())
+    Serial.printf("[wind] advisory popup %.0fkt/%.0fkt snoozes=%d\n",
+                  g_windAlertKt, g_windAlertGustKt, g_windSnoozes);
+}
+
+// Silence advisories for 24 h.
+void windAlertDismiss() {
+  g_windFiring = false;
+  g_windAlertPending = false;
+  g_windSnoozes = 0;
+  g_windSnoozeUntil = 0;
+  g_windDismissedUntil = (uint32_t)(time(nullptr) + WIND_DISMISS_SEC);
+  prefs.begin("flight", false);
+  prefs.putULong("winddis", g_windDismissedUntil);
+  prefs.putULong("windsnz", 0);
+  prefs.putInt("windsnc", 0);
+  prefs.end();
+  g_screen = SCR_DASH;
+  g_screenIdleUntil = 0;
+  dirty = true;
+  if (isDevBuild()) Serial.printf("[wind] dismissed until %lu\n", (unsigned long)g_windDismissedUntil);
+}
+
+// Park the popup 6 h; past WIND_MAX_SNOOZES the request dismisses for the day
+// (same shape as alarmSnooze()). Also the unanswered-popup path.
+void windAlertSnooze() {
+  g_windFiring = false;
+  g_windAlertPending = false;
+  if (g_windSnoozes >= WIND_MAX_SNOOZES) { windAlertDismiss(); return; }
+  g_windSnoozes++;
+  g_windSnoozeUntil = (uint32_t)(time(nullptr) + WIND_SNOOZE_SEC);
+  prefs.begin("flight", false);
+  prefs.putULong("windsnz", g_windSnoozeUntil);
+  prefs.putInt("windsnc", g_windSnoozes);
+  prefs.end();
+  g_screen = SCR_DASH;
+  g_screenIdleUntil = 0;
+  dirty = true;
+  if (isDevBuild())
+    Serial.printf("[wind] snoozed %d/%d until %lu\n", g_windSnoozes, WIND_MAX_SNOOZES,
+                  (unsigned long)g_windSnoozeUntil);
+}
+
+// Full-screen popup: the readings that tripped it, Dismiss (24 h), Snooze
+// (6 h). Button geometry mirrors the alarm fire screen.
+void drawWindAlert() {
+  tft.fillScreen(TFT_BLACK);
+  tft.fillRect(0, 0, DISP_W, 52, TFT_MAROON);
+  tft.setTextColor(TFT_WHITE, TFT_MAROON);
+  tft.drawCentreString("WIND ADVISORY", CX, 14, 4);
+
+  tft.setTextFont(2);
+  tft.setTextColor(TFT_ORANGE, TFT_BLACK);
+  tft.drawCentreString("NWS advisory level reached", CX, 62, 2);
+
+  char buf[24];
+  tft.setTextFont(4);
+  tft.setTextColor(TFT_WHITE, TFT_BLACK);
+  snprintf(buf, sizeof buf, "%d%s", (int)round(spdDisp(g_windAlertKt)), spdUnit());
+  tft.drawCentreString(buf, CX - 78, 86, 4);
+  snprintf(buf, sizeof buf, "%d%s", (int)round(spdDisp(g_windAlertGustKt)), spdUnit());
+  tft.drawCentreString(buf, CX + 78, 86, 4);
+  tft.setTextFont(2);
+  tft.setTextColor(TFT_LIGHTGREY, TFT_BLACK);
+  tft.drawCentreString("steady", CX - 78, 112, 2);
+  tft.drawCentreString("gusts", CX + 78, 112, 2);
+
+  tft.setTextColor(TFT_LIGHTGREY, TFT_BLACK);
+  if (g_windSnoozes > 0) {
+    char sb[24];
+    snprintf(sb, sizeof sb, "Snoozed %d/%d", g_windSnoozes, WIND_MAX_SNOOZES);
+    tft.drawCentreString(sb, CX, 136, 2);
+  }
+
+  themeBtn(CX - 144, 158, 140, 62, 8);
+  tft.setTextColor(btnFg(btnCol()), btnCol());
+  tft.drawCentreString("Dismiss", CX - 74, 174, 2);
+  tft.drawCentreString("24 h", CX - 74, 194, 2);
+  themeBtn(CX + 4, 158, 140, 62, 8);
+  tft.drawCentreString("Snooze", CX + 74, 174, 2);
+  tft.drawCentreString("6 h", CX + 74, 194, 2);
+}
+
+void handleWindAlertTouch(uint16_t x, uint16_t y) {
+  if (inRect(x, y, CX - 144, 158, CX - 4, 220)) windAlertDismiss();
+  else if (inRect(x, y, CX + 4, 158, CX + 144, 220)) windAlertSnooze();
+}
+
+// ---- shared wind-alert settings rows ----
+// Settings > General and the Wind Tiers page both own these two controls; the
+// caller passes the row tops so each page keeps its own grid.
+void drawWindAlertControls(int yToggle, int yNotify) {
+  tft.setTextFont(2);
+  tft.setTextColor(TFT_WHITE, TFT_BLACK);
+  tft.setCursor(8, yToggle + 4);
+  tft.print("Wind Alert");
+  tft.setTextColor(g_windAlertOn ? TFT_GREENYELLOW : TFT_LIGHTGREY, TFT_BLACK);
+  tft.setCursor(150, yToggle + 4);
+  tft.print(g_windAlertOn ? "ON" : "OFF");
+  themeBtn(RX(230), yToggle, 82, 24, 5);
+  tft.setTextColor(btnFg(btnCol()), btnCol());
+  tft.setTextFont(FONT_AUX);
+  tft.setCursor(RX(250), yToggle + 7);
+  tft.print("Toggle");
+
+  tft.setTextFont(2);
+  tft.setTextColor(TFT_WHITE, TFT_BLACK);
+  tft.setCursor(8, yNotify + 4);
+  tft.print("Wind Notify");
+  tft.setTextColor(TFT_GREENYELLOW, TFT_BLACK);
+  tft.drawCentreString(alarmPresetName(g_windNotify), RX(205), yNotify + 4, 2);
+  adjPair(TADJ_MX, yNotify - 4);
+}
+
+// True when the tap landed on one of those rows (and applied it).
+bool handleWindAlertControlsTouch(uint16_t x, uint16_t y, int yToggle, int yNotify) {
+  if (inRect(x, y, RX(230), yToggle, RX(312), yToggle + 24)) {
+    g_windAlertOn = !g_windAlertOn;
+    prefs.begin("flight", false); prefs.putBool("windalrt", g_windAlertOn); prefs.end();
+    dirty = true;
+    return true;
+  }
+  int np = adjPairHit(x, y, TADJ_MX, yNotify - 4);
+  if (np) {
+    g_windNotify = alarmPresetStep(g_windNotify, np);
+    previewAlarmLed(g_windNotify);   // hear the pick as you step
+    prefs.begin("flight", false); prefs.putInt("windntf", g_windNotify); prefs.end();
+    dirty = true;
+    return true;
+  }
+  return false;
 }
