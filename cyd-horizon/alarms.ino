@@ -228,6 +228,26 @@ static const NtfStep kPatJingle[] = {  // jingle bells phrase
   { 659, 140, 7 }, { 784, 140, 7 }, { 523, 140, 7 }, { 587, 140, 7 },
   { 659, 400, 7 }, { 0, 1120, 0 },
 };
+// Wind-evoked sounds, for a future wind-advisory alert: a square-wave speaker
+// can't make noise, so these suggest wind by gesture (chime drift, gust swell,
+// gap whistle) instead of hiss. Amber LED reads as "caution", not emergency.
+static const NtfStep kPatBreeze[] = {  // wind chimes in a gust
+  { 1319, 90, 3 }, { 0, 210, 0 }, { 1568, 90, 3 }, { 0, 150, 0 },
+  { 1175, 110, 3 }, { 0, 260, 0 }, { 1760, 80, 3 }, { 0, 180, 0 },
+  { 1397, 120, 3 }, { 0, 900, 0 },
+};
+static const NtfStep kPatGust[] = {    // gust builds, peaks, then eases
+  { 294, 90, 3 }, { 330, 90, 3 }, { 392, 90, 3 }, { 466, 90, 3 },
+  { 523, 110, 3 }, { 587, 110, 3 }, { 659, 160, 3 }, { 0, 120, 0 },
+  { 587, 90, 3 }, { 523, 90, 3 }, { 466, 90, 3 }, { 392, 150, 3 },
+  { 0, 900, 0 },
+};
+static const NtfStep kPatWhistle[] = { // wind whistling through a gap
+  { 587, 120, 3 }, { 622, 120, 3 }, { 659, 120, 3 }, { 622, 120, 3 },
+  { 587, 120, 3 }, { 0, 300, 0 },
+  { 523, 120, 3 }, { 587, 120, 3 }, { 622, 120, 3 }, { 587, 120, 3 },
+  { 0, 1000, 0 },
+};
 // Indices are persisted (per-alarm in the NVS blob, and the callsign-notify
 // choice in "watchntf"), so never reorder - append new presets at the end.
 struct NtfPreset { const char* name; const NtfStep* steps; uint8_t n; };
@@ -282,6 +302,9 @@ static const NtfPreset kNtfPresets[] = {
   NTFPRESET("Smoke",    kPatSmoke),
   NTFPRESET("Dixie",    kPatDixie),
   NTFPRESET("Jingle",   kPatJingle),
+  NTFPRESET("Breeze",   kPatBreeze),
+  NTFPRESET("Gust",     kPatGust),
+  NTFPRESET("Whistle",  kPatWhistle),
 };
 static const int kNumAlarmPresets =
     sizeof(kNtfPresets) / sizeof(kNtfPresets[0]);
@@ -573,10 +596,11 @@ void previewAlarmLed(int preset) {
 static uint32_t g_testBeepUntil = 0;
 void notifyTestBeep() { g_testBeepUntil = millis() + 160; }
 
-// True while the alarm LED owns the LED: a firing alarm or a preset preview.
-// The normal flight/status LED code skips its updates while this is set.
+// True while the alarm LED owns the LED: a firing alarm, a firing advisory
+// popup, or a preset preview. The normal flight/status LED code skips its
+// updates while this is set.
 bool alarmLedBusy() {
-  return g_alarmFiring ||
+  return g_alarmFiring || g_windFiring ||
          (g_ledPreviewPreset >= 0 && (long)(millis() - g_ledPreviewUntil) < 0);
 }
 
@@ -611,6 +635,8 @@ void updateAlarmLed(unsigned long now) {
   if (g_alarmFiring)
     preset = (g_fireIdx >= 0 && g_fireIdx < g_alarmCount)
                  ? g_alarms[g_fireIdx].preset : 0;
+  else if (g_windFiring)
+    preset = g_windNotify;
   else if (g_ledPreviewPreset >= 0 && (long)(now - g_ledPreviewUntil) < 0)
     preset = g_ledPreviewPreset;
   if (preset < 0) {
@@ -838,8 +864,6 @@ void drawAlarmFire() {
     char sb[24];
     snprintf(sb, sizeof sb, "Snoozed %d/%d", a.snoozes, ALARM_MAX_SNOOZES);
     tft.drawCentreString(sb, CX, 120, 2);
-  } else {
-    tft.drawCentreString(alarmPresetName(a.preset), CX, 120, 2);
   }
 
   themeBtn(CX - 144, 158, 140, 62, 8);

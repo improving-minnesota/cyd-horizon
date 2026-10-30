@@ -17,6 +17,7 @@ int   g_netAps[20];         // how many access points share that SSID
 int  g_netCount = 0;
 int  g_netScroll = 0;
 bool g_scanning = false;   // an async WiFi scan is in flight
+static unsigned long g_scanStart = 0;   // millis() when the scan was kicked
 String g_ssid = "";
 String g_pass = "";
 // g_latLonStr is defined in cyd-horizon.ino (concatenation order)
@@ -38,6 +39,7 @@ void scanWifi() {
   WiFi.mode(WIFI_STA);            // scanning needs the STA radio even with no creds
   WiFi.scanNetworks(true);
   g_scanning = true;
+  g_scanStart = millis();
   g_netCount = 0;
   g_netScroll = 0;
 }
@@ -92,6 +94,8 @@ void pollWifiScan() {
     }
   }
   WiFi.scanDelete();   // free the driver's result list
+  if (isDevBuild())
+    Serial.printf("[wifi] scan %d networks in %lums\n", g_netCount, millis() - g_scanStart);
   dirty = true;
 }
 
@@ -109,6 +113,7 @@ void drawWifiScreen() {
   else if (g_wifiSub == 11) drawKeyboard("Home Airport (ICAO)", g_homeAirport, false);
   else if (g_wifiSub == 13) drawKeyboard("Watch Callsign (ICAO)", g_watchCallsign, false);
   else if (g_wifiSub == 12) drawAddrStatus();
+  else if (g_wifiSub == 14) drawSearchingAddr(g_addrSearch);
   else if (g_wifiSub == 20) drawIpConfig();
   else if (g_wifiSub == 21) drawKeyboard("Static IP Address", g_staticIp, false);
   else if (g_wifiSub == 22) drawKeyboard("Subnet Mask", g_staticMask, false);
@@ -121,6 +126,7 @@ void drawWifiScreen() {
 void handleWifiTouch(uint16_t x, uint16_t y) {
   if (g_wifiSub == 0) handleWifiListTouch(x, y);
   else if (g_wifiSub == 12) handleAddrStatusTouch(x, y);
+  else if (g_wifiSub == 14) return;   // geocode in flight: taps are ignored
   else if (g_wifiSub == 20) handleIpConfigTouch(x, y);
   else handleKeyboardTouch(x, y);
 }
@@ -152,7 +158,7 @@ void drawWifiList() {
     tft.setTextColor(TFT_CYAN, TFT_BLACK);
     tft.setTextFont(2);
     tft.setCursor(8, 52);
-    tft.print("No networks found");
+    tft.print("No 2.4GHz networks found");
   }
 
   int visible = (g_netCount - g_netScroll > 6) ? 6 : (g_netCount - g_netScroll);
@@ -650,21 +656,22 @@ void handleKeyboardTouch(uint16_t x, uint16_t y) {
       else if (g_wifiSub == 3) { g_wifiSub = 4; dirty = true; }
       else if (g_wifiSub == 4) { saveOsCreds(); g_screen = SCR_FTRACKER; dirty = true; }
       else if (g_wifiSub == 5) {
-        // Show "Searching..." during the blocking geocode; on failure land on
-        // sub 12 so the user can fix the address instead of starting over.
+        // The geocode runs on the net task (TLS can't use loopTask's stack);
+        // sub 14 shows "Searching..." until pollLocationFetches() lands on the
+        // result page or back on the Location page.
         if (g_addrSearch.length() == 0) {
           g_addrErr = "empty";
           g_wifiSub = 12;
           dirty = true;
-        } else {
-          drawSearchingAddr(g_addrSearch);
-          if (geocodeAddress()) {
-            g_addrErr = "";
-            g_screen = SCR_LOCATION;
+        } else if (g_geoState != 1) {
+          if (WiFi.status() != WL_CONNECTED) {
+            g_addrErr = friendlyGeoError("geo 0");
+            g_wifiSub = 12;
           } else {
-            g_addrErr = (String(lastErr) == "no match") ? "no-match"
-                                                         : friendlyGeoError(lastErr);
-            g_wifiSub = 12;   // stay in the flow; "Fix Address" returns to edit
+            g_geoState = 1;
+            g_geoStart = millis();
+            netWantGeocode = true;
+            g_wifiSub = 14;
           }
           dirty = true;
         }
@@ -909,6 +916,19 @@ void handleSerialCommands() {
         Serial.println("CMD: OTA_GO missing OTA_IP/OTA_FILE");
       } else if (scheduleOTA(url)) {
         Serial.println("CMD: OTA scheduled from " + url);
+      }
+    } else if (key == "WINDALERT") {   // dev: force / clear the advisory popup
+      if (val == "reset") {
+        g_windDismissedUntil = 0; g_windSnoozeUntil = 0; g_windSnoozes = 0;
+        prefs.begin("flight", false);
+        prefs.putULong("winddis", 0); prefs.putULong("windsnz", 0); prefs.putInt("windsnc", 0);
+        prefs.end();
+        Serial.println("CMD: WINDALERT cleared dismiss/snooze");
+      } else {
+        g_windAlertKt = 27.0f;          // advisory-level sample (31 mph / 46 mph)
+        g_windAlertGustKt = 40.0f;
+        g_windAlertPending = true;
+        Serial.println("CMD: WINDALERT queued");
       }
     } else {
       Serial.println("CMD: unknown command " + key);

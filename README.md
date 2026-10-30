@@ -5,7 +5,7 @@
 [![Release](https://img.shields.io/github/v/release/improving-minnesota/cyd-horizon)](https://github.com/improving-minnesota/cyd-horizon/releases)
 
 <img src="docs/user-guide/cyd-horizon-guide-logo.png" width="800"
-     alt="cyd-horizon logo — slogan &quot;Live Flight Tracker &amp; Weather Station&quot; with bullets: Live ADS-B Flight Radar, Live Weather &amp; Forecasts, Pool Temperature Monitoring, 50 Alarms &amp; Melody Presets, Standalone WiFi · Auto-OTA">
+     alt="cyd-horizon logo — slogan &quot;Live Flight Tracker &amp; Weather Station&quot; with bullets: Live ADS-B Flight Radar, Live Weather &amp; Forecasts, Pool Temperature Monitoring, 53 Alarms &amp; Melody Presets, Standalone WiFi · Auto-OTA">
 
 **Live flight tracker & weather station** for **Cheap Yellow Display (CYD)**
 boards:
@@ -65,7 +65,7 @@ Once it's set up it runs on your WiFi — no computer needed.
   your home airport (ICAO), yellow when both origin and destination are your
   home airport. Red, green, and yellow stay lit while the live flight is
   displayed. A watched callsign instead alerts with its **Callsign
-  Notify** pattern — the same 50 presets as alarms, from a soft **Simple**
+  Notify** pattern — the same 53 presets as alarms, from a soft **Simple**
   beep to melodies like **Charge** and **Two Bits** — on the LED and speaker
   while its flight details are shown. The watch value matches any part of
   the callsign, so `DAL` catches `DAL1234` and `5432` catches `DAL5432` (`*`
@@ -104,6 +104,16 @@ Once it's set up it runs on your WiFi — no computer needed.
   earlier. The Metric setting shows km/h. The current temperature is also
   saved on the device (always on) and graphed over Day / Week / Month / Year with the
   low, average, and high.
+- **Advisory wind alert** — when either reading reaches the red tier, the
+  device raises a full-screen **Wind Advisory** popup (waking from Sleep Mode
+  if needed) and plays its notification on the LED and speaker. **Dismiss**
+  silences advisories for **24 hours**; **Snooze** re-arms in **6 hours**, up
+  to **3 times** — past that, the next snooze dismisses for the day. An
+  unanswered popup snoozes itself after 2 minutes, like an alarm. On by
+  default; the sound defaults to **Breeze** (wind chimes).
+- **Wind tiers page** — tap the wind/gusts rows on the dashboard for the tier
+  table, in the selected speed unit, with the advisory-alert toggle and its
+  notification sound on the same page.
 
 ## Hardware
 
@@ -129,8 +139,8 @@ board-variant, wiring, and flashing details in
    flashing instructions are in [DEVELOPER.md](DEVELOPER.md).
 2. **Power it up.** The first boot runs a short setup wizard: it calibrates the
    touchscreen (if no calibration is saved), then walks you through entering
-   your WiFi name and password. To change WiFi later, open **Settings →
-   Network**.
+   your WiFi name and password. The device supports **2.4 GHz WiFi only**
+   (not 5 GHz). To change WiFi later, open **Settings → Network**.
 3. If the wizard is skipped or you need to redo a step: calibrate via
    **Settings → Calibrate Touch** (or hold anywhere on the screen for
    10 s), and connect WiFi via **Settings → Network**.
@@ -148,7 +158,8 @@ Where to get each credential is explained below.
 ### Getting the credentials
 
 - **WiFi** — the SSID (network name) and password for your home network. Find
-  them on your router, or ask whoever set up your WiFi.
+  them on your router, or ask whoever set up your WiFi. It must be a
+  **2.4 GHz** network — 5 GHz is not supported.
 - **OpenSky (optional, for flights)** — flights work out of the box, but you can
   raise the rate limit by making a free account at
   [opensky-network.org](https://opensky-network.org) and creating an API client
@@ -207,7 +218,7 @@ Defaults for a freshly reset device are shown with each setting.
   callsign — `DAL` catches
   `DAL1234`, or `*` to match every flight) and its **Callsign Notify** pattern (LED + speaker
   alert while its flight details are shown — works even when LED blinking is
-  off — the same 50 presets as alarms), **Show IATA Airports** (display route
+  off — the same 53 presets as alarms), **Show IATA Airports** (display route
   airports as `ICAO | IATA` when ADSB.lol provides an IATA code), and
   whether to blink the LED for
   an overhead flight. Also where you
@@ -235,11 +246,16 @@ Defaults for a freshly reset device are shown with each setting.
   **Units**
   (**Imperial** ft/mph/mi, **Metric** m/km/h/km, or **Aviation** ft/kts/nm —
   also sets weather and pool temps to °F or °C), and choose a **12 or
-  24-hour clock** (24-hour hides the AM/PM marker). The picked color also
+  24-hour clock** (24-hour hides the AM/PM marker). Page 2 of General holds
+  the **Wind Alert** toggle (advisory popup on/off, default on) and its
+  **Wind Notify** sound (default **Breeze**) — the same two controls are on
+  the wind tiers page.
+  The picked color also
   themes the
   ordinary screen buttons (black text on light colors, white on dark).
   Defaults: color **blue**, auto-update **on** (for release builds),
-  notify volume **10**, units **imperial**, clock **12-hour**.
+  notify volume **10**, units **imperial**, clock **12-hour**, wind alert
+  **on**, wind notify **Breeze**.
 - **Help** — this guide, on the device.
 - **Location** — set your coordinates so weather and flights are accurate. Use
   **Set** to type them, **Search Address**, or **Find by IP**. Default: none —
@@ -247,7 +263,9 @@ Defaults for a freshly reset device are shown with each setting.
   **Search Address** keeps your last search so you can fix it, and shows a clear
   message if the address can't be found.
 - **Network** — your WiFi network (it scans in the background — pick from the
-  list once "Scanning" finishes, or enter it manually), plus **IP
+  list once "Scanning" finishes, which takes a few seconds, longer the first
+  time after boot, or enter it manually; only **2.4 GHz**
+  networks are supported), plus **IP
   Setup**: addressing can stay on **DHCP** (the default, works as before) or be
   switched to **Static** with an IP address, subnet mask, gateway, and DNS
   server, and you can set a device **hostname** (default `cyd-horizon`) in
@@ -308,6 +326,9 @@ or Find by IP).
 **A flight's route or ground track looks wrong.** Route and track data come
 from third-party feeds (ADSB.lol, OpenSky) that may not have the latest
 data — a route can be missing, outdated, or inaccurate.
+
+**The device can't connect to WiFi, or your network isn't listed.** The device
+supports **2.4 GHz WiFi only** — it can't see or join 5 GHz networks.
 
 **The device moved to a new WiFi network.** Re-enter the network under
 **Settings → Network**.

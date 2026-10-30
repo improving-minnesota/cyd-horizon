@@ -153,7 +153,7 @@ static const char* const kHelpLines[] = {
   "  - Live ADS-B flight radar",
   "  - Live weather & forecasts",
   "  - Pool temperature monitor",
-  "  - 50 alarm & melody presets",
+  "  - 53 alarm & melody presets",
   "  - Standalone WiFi; auto-OTA",
   "",
   "FEATURES",
@@ -176,6 +176,15 @@ static const char* const kHelpLines[] = {
   "  <20 (<17), yellow 20-34",
   "  (17-29), orange 35-45",
   "  (30-39), red 46+ (40+).",
+  "Red raises the Advisory Wind",
+  "  Alert popup (if on): wake",
+  "  from sleep, LED + sound.",
+  "  Dismiss = 24h; Snooze = 6h",
+  "  up to 3x, then dismisses.",
+  "  Unanswered popup snoozes",
+  "  itself after 2 minutes.",
+  "  Tap the wind/gusts rows for",
+  "  the tier table + settings.",
   "Flights (optional, on):",
   "  live aircraft with a",
   "  radar, callsign, planned",
@@ -196,7 +205,7 @@ static const char* const kHelpLines[] = {
   "alerts with its",
   "Callsign Notify pattern on the",
   "LED + speaker while shown - the",
-  "same 50 presets as alarms, from",
+  "same 53 presets as alarms, from",
   "Simple's soft beep to melodies",
   "like Charge. The LED also glows",
   "red for a critical error (No WiFi,",
@@ -253,7 +262,7 @@ static const char* const kHelpLines[] = {
   "Alarms: tap the header clock.",
   "  Up to 6 alarms with weekday",
   "  masks (all off = one-time)",
-  "  and a Notify pattern: 50",
+  "  and a Notify pattern: 53",
   "  LED + sound alerts: blinks,",
   "  chimes, sirens, sweeps, Morse,",
   "  and tunes (Nokia, Tetris,",
@@ -278,6 +287,8 @@ static const char* const kHelpLines[] = {
   "Fresh device / after Factory",
   "  Reset: it calibrates touch,",
   "  then asks for your WiFi.",
+  "  WiFi must be 2.4GHz; 5GHz",
+  "  networks are not supported.",
   "To redo either later:",
   "  Calibrate: Settings ->",
   "    Calibrate Touch, or",
@@ -308,6 +319,8 @@ static const char* const kHelpLines[] = {
   "GETTING CREDENTIALS",
   "WiFi: from your router - the",
   "   network name and password.",
+  "   Must be a 2.4GHz network;",
+  "   5GHz is not supported.",
   "OpenSky (flights, optional):",
   "   free account at",
   "   opensky-network.org -> My",
@@ -347,6 +360,10 @@ static const char* const kHelpLines[] = {
   "   Notify Volume: levels",
   "   1-10 (default 10)",
   "   for all speaker sounds.",
+  "   Wind Alert page 2: popup",
+  "   on/off + Wind Notify",
+  "   sound (Breeze). Same two",
+  "   controls on Wind Tiers.",
   "Location: your coordinates;",
   "   IP guess on first boot.",
   "   Search Address keeps your",
@@ -357,6 +374,8 @@ static const char* const kHelpLines[] = {
   "   DNS and hostname. The",
   "   list shows 'Scanning'",
   "   while it searches.",
+  "   Only 2.4GHz networks are",
+  "   listed - 5GHz won't appear.",
   "Pool Temp: off; add Govee key,",
   "   pick thermometer.",
   "   (off = no data collected)",
@@ -394,6 +413,10 @@ static const char* const kHelpLines[] = {
   "   and may be stale or wrong.",
   "New WiFi network? Re-enter it",
   "   under Settings -> Network.",
+  "WiFi won't connect or your",
+  "   network isn't listed? The",
+  "   device is 2.4GHz only - it",
+  "   can't see or join 5GHz.",
   "",
   "UPDATES",
   "Auto-Update (General) checks",
@@ -625,6 +648,7 @@ void drawGeneral() {
 
   backBtn("Back");
 
+  if (g_genPage == 0) {
   // Clock Color: label + swatch of the current color (tap opens the picker);
   // the pick is also the theme color for ordinary buttons.
   tft.setTextColor(TFT_WHITE, TFT_BLACK);
@@ -697,11 +721,49 @@ void drawGeneral() {
   tft.setCursor(8, 206);
   tft.print("Units also set weather/pool F or C.");
   tft.setCursor(8, 216);
-  tft.print("24h clock hides the AM/PM marker.");
+  tft.print("Page 2 has the wind alert settings.");
+  } else {
+    // Page 2: advisory wind alert (same two controls as the Wind Tiers page).
+    drawWindAlertControls(48, 96);
+
+    tft.setTextColor(TFT_LIGHTGREY, TFT_BLACK);
+    tft.setTextFont(FONT_AUX);
+    tft.setCursor(10, 138); tft.print("Fires when wind or gusts reach the red");
+    tft.setCursor(10, 150); tft.print("advisory tier; the device wakes from sleep.");
+    tft.setCursor(10, 162); tft.print("Dismiss = 24 h. Snooze = 6 h, up to 3 times,");
+    tft.setCursor(10, 174); tft.print("then dismisses for the day. An unanswered");
+    tft.setCursor(10, 186); tft.print("popup snoozes itself after 2 minutes.");
+  }
+
+  // Pager (bottom): left/right arrows + page indicator, same as Flight Tracker
+  tft.setTextFont(1);
+  tft.setTextColor(TFT_LIGHTGREY, TFT_BLACK);
+  tft.setCursor(CX - 20, 222);
+  tft.printf("Page %d/2", g_genPage + 1);
+  if (g_genPage > 0) {
+    themeBtn(12, 214, 44, 26, 6);
+    tft.setTextColor(btnFg(btnCol()), btnCol());
+    tft.setTextFont(2);
+    tft.setCursor(27, 220);
+    tft.print("<");
+  }
+  if (g_genPage < 1) {
+    themeBtn(RX(264), 214, 44, 26, 6);
+    tft.setTextColor(btnFg(btnCol()), btnCol());
+    tft.setTextFont(2);
+    tft.setCursor(RX(279), 220);
+    tft.print(">");
+  }
 }
 
 void handleGeneralTouch(uint16_t x, uint16_t y) {
   if (inRect(x, y, RX(265), 4, RX(315), 24)) { g_screen = SCR_SETTINGS; dirty = true; return; }
+  // Pager arrows
+  if (inRect(x, y, 12, 214, 56, 240)) { if (g_genPage > 0) { g_genPage--; dirty = true; } return; }
+  if (inRect(x, y, RX(264), 214, RX(308), 240)) { if (g_genPage < 1) { g_genPage++; dirty = true; } return; }
+
+  if (g_genPage == 1) { handleWindAlertControlsTouch(x, y, 48, 96); return; }
+
   if (inRect(x, y, RX(230), 68, RX(312), 92)) {  // Auto-Update toggle
     g_autoUpdate = !g_autoUpdate;
     prefs.begin("flight", false); prefs.putBool("autoupd", g_autoUpdate); prefs.end();
@@ -797,7 +859,11 @@ void drawLocation() {
 
   // Confirmation / error from the last address search
   tft.setTextFont(1);
-  if (g_lastPlace.length()) {
+  if (g_locPending) {
+    tft.setTextColor(TFT_CYAN, TFT_BLACK);
+    tft.setCursor(8, 190);
+    tft.print("Finding location...");
+  } else if (g_lastPlace.length()) {
     tft.setTextColor(TFT_GREENYELLOW, TFT_BLACK);
     tft.setCursor(8, 184);
     tft.print("Location:");
@@ -811,6 +877,10 @@ void drawLocation() {
     tft.setTextColor(TFT_LIGHTGREY, TFT_BLACK);
     tft.setCursor(8, 196);
     tft.print("Search again or set lat/lon.");
+  } else if (String(lastErr).startsWith("geo 0")) {
+    tft.setTextColor(TFT_RED, TFT_BLACK);
+    tft.setCursor(8, 190);
+    tft.print("No internet connection.");
   } else {
     tft.setTextColor(TFT_LIGHTGREY, TFT_BLACK);
     tft.setCursor(8, 190);
