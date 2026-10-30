@@ -1,5 +1,12 @@
 # Changelog
 
+## [3.11.0](https://github.com/improving-minnesota/cyd-horizon/compare/v3.10.5...v3.11.0) (2026-10-30)
+
+
+### Features
+
+* wind tiers page, advisory wind alert and wind-evoked sounds ([#189](https://github.com/improving-minnesota/cyd-horizon/issues/189)) ([289c11d](https://github.com/improving-minnesota/cyd-horizon/commit/289c11d3f410c8e51c2fca2be14e6c32f915030e))
+
 ## [3.10.5](https://github.com/improving-minnesota/cyd-horizon/compare/v3.10.4...v3.10.5) (2026-10-16)
 
 
